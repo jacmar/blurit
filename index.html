@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Selective Focus</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+    <style>
+        :root {
+            --primary-color: #4285f4;
+            --primary-dark: #3367d6;
+            --text-color: #333;
+            --light-grey: #f5f5f5;
+            --border-color: #ddd;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text-color);
+            background-color: var(--light-grey);
+            line-height: 1.6;
+        }
+        
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 500;
+        }
+        
+        main {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .card-title {
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            font-weight: 500;
+        }
+        
+        .upload-container {
+            border: 2px dashed var(--border-color);
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            transition: all 0.3s;
+        }
+        
+        .upload-container:hover {
+            background-color: rgba(66, 133, 244, 0.04);
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.25rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: background-color 0.3s;
+            width: 100%;
+            margin-top: 1rem;
+        }
+        
+        button:hover {
+            background-color: var(--primary-dark);
+        }
+        
+        select, input[type="range"] {
+            width: 100%;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 1rem;
+            background-color: white;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        
+        .parameter-group {
+            margin-bottom: 1rem;
+        }
+        
+        .processing {
+            text-align: center;
+            padding: 2rem;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top: 4px solid var(--primary-color);
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 1rem auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        #imagePreviewGrid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin: 1rem 0;
+        }
+        
+        .preview-item {
+            position: relative;
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+        
+        .preview-item img {
+            width: 100%;
+            display: block;
+        }
+        
+        #results {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 1rem;
+        }
+        
+        .result-item {
+            border-radius: 4px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .result-item img {
+            width: 100%;
+            display: block;
+        }
+        
+        .result-actions {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem;
+        }
+        
+        .result-actions button {
+            margin-top: 0;
+            padding: 0.5rem;
+            font-size: 0.9rem;
+        }
+        
+        @media (max-width: 600px) {
+            .card {
+                padding: 1rem;
+            }
+            #imagePreviewGrid {
+                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            }
+            #results {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>SELECTIVE FOCUS</h1>
+    </header>
+    
+    <main>
+        <div class="card" id="uploadCard">
+            <h2 class="card-title">Seleziona Immagini</h2>
+            <div class="upload-container" id="dropZone">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#4285f4" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <p>Tocca per selezionare immagini dalla galleria</p>
+            </div>
+            <input type="file" id="fileInput" style="display:none" accept="image/*" multiple>
+            
+            <div id="selectedImagesContainer" class="hidden">
+                <h3 class="card-title">Immagini Selezionate (<span id="imageCount">0</span>)</h3>
+                <div id="imagePreviewGrid"></div>
+                <button id="proceedButton">Procedi con l'Elaborazione</button>
+            </div>
+        </div>
+        
+        <div class="card hidden" id="optionsCard">
+            <h2 class="card-title">Parametri di Elaborazione</h2>
+            
+            <div class="parameter-group">
+                <label for="modeSelect">Modalità di Elaborazione:</label>
+                <select id="modeSelect">
+                    <option value="standard">Standard - Crea una singola immagine con parametri personalizzati</option>
+                    <option value="explore">Esplora - Genera 4 varianti con seed diversi</option>
+                    <option value="sample">Sample - Genera 6 varianti artistiche con lo stesso seed</option>
+                    <option value="refine">Refine - Usa un seed specifico con parametri personalizzati</option>
+                </select>
+            </div>
+            
+            <div class="parameter-group" id="seedGroup">
+                <label for="seedSelect">Seed:</label>
+                <select id="seedSelect">
+                    <option value="random">Genera automaticamente un seed casuale</option>
+                    <option value="custom">Inserisci un seed specifico</option>
+                </select>
+                
+                <div id="customSeedGroup" class="hidden">
+                    <label for="seedInput">Seed (numero intero):</label>
+                    <input type="number" id="seedInput" placeholder="Es. 42" min="1" max="999999">
+                </div>
+            </div>
+            
+            <div id="customParamsGroup">
+                <h3 class="card-title">Parametri Personalizzati</h3>
+                
+                <div class="parameter-group">
+                    <label for="focusRatio">Focus Ratio (0.1-0.9):</label>
+                    <input type="range" id="focusRatio" min="0.1" max="0.9" step="0.05" value="0.3">
+                    <span id="focusRatioValue">0.3</span>
+                </div>
+                
+                <div class="parameter-group">
+                    <label for="blurStrength">Blur Strength (0.1-1.0):</label>
+                    <input type="range" id="blurStrength" min="0.1" max="1.0" step="0.05" value="0.7">
+                    <span id="blurStrengthValue">0.7</span>
+                </div>
+                
+                <div class="parameter-group">
+                    <label for="randomness">Randomness (0.0-1.0):</label>
+                    <input type="range" id="randomness" min="0" max="1.0" step="0.05" value="0.5">
+                    <span id="randomnessValue">0.5</span>
+                </div>
+                
+                <div class="parameter-group">
+                    <label for="ghostThreshold">Ghost Threshold (0.0-1.0):</label>
+                    <input type="range" id="ghostThreshold" min="0" max="1.0" step="0.05" value="0.5">
+                    <span id="ghostThresholdValue">0.5</span>
+                </div>
+            </div>
+            
+            <button id="processButton">Elabora Immagini</button>
+        </div>
+        
+        <div class="card hidden" id="processingCard">
+            <div class="processing">
+                <h2 class="card-title">Elaborazione in corso...</h2>
+                <div class="spinner"></div>
+                <p id="processingStatus">Preparazione delle immagini...</p>
+            </div>
+        </div>
+        
+        <div class="card hidden" id="resultsCard">
+            <h2 class="card-title">Risultati</h2>
+            <div id="results"></div>
+            <button id="saveAllButton">Salva Tutte</button>
+            <button id="newImagesButton">Elabora Nuove Immagini</button>
+        </div>
+    </main>
+    
+    <script>
+        // Elementi DOM
+        const fileInput = document.getElementById('fileInput');
+        const dropZone = document.getElementById('dropZone');
+        const selectedImagesContainer = document.getElementById('selectedImagesContainer');
+        const imagePreviewGrid = document.getElementById('imagePreviewGrid');
+        const imageCount = document.getElementById('imageCount');
+        const proceedButton = document.getElementById('proceedButton');
+        
+        const uploadCard = document.getElementById('uploadCard');
+        const optionsCard = document.getElementById('optionsCard');
+        const processingCard = document.getElementById('processingCard');
+        const resultsCard = document.getElementById('resultsCard');
+        
+        const modeSelect = document.getElementById('modeSelect');
+        const seedGroup = document.getElementById('seedGroup');
+        const seedSelect = document.getElementById('seedSelect');
+        const customSeedGroup = document.getElementById('customSeedGroup');
+        const seedInput = document.getElementById('seedInput');
+        const customParamsGroup = document.getElementById('customParamsGroup');
+        
+        const focusRatio = document.getElementById('focusRatio');
+        const focusRatioValue = document.getElementById('focusRatioValue');
+        const blurStrength = document.getElementById('blurStrength');
+        const blurStrengthValue = document.getElementById('blurStrengthValue');
+        const randomness = document.getElementById('randomness');
+        const randomnessValue = document.getElementById('randomnessValue');
+        const ghostThreshold = document.getElementById('ghostThreshold');
+        const ghostThresholdValue = document.getElementById('ghostThresholdValue');
+        
+        const processButton = document.getElementById('processButton');
+        const processingStatus = document.getElementById('processingStatus');
+        const results = document.getElementById('results');
+        const saveAllButton = document.getElementById('saveAllButton');
+        const newImagesButton = document.getElementById('newImagesButton');
+        
+        // Variabili globali
+        let selectedImages = [];
+        let imageElements = [];
+        let processedResults = [];
+        
+        // Aggiorna valori degli slider
+        focusRatio.addEventListener('input', function() {
+            focusRatioValue.textContent = this.value;
+        });
+        
+        blurStrength.addEventListener('input', function() {
+            blurStrengthValue.textContent = this.value;
+        });
+        
+        randomness.addEventListener('input', function() {
+            randomnessValue.textContent = this.value;
+        });
+        
+        ghostThreshold.addEventListener('input', function() {
+            ghostThresholdValue.textContent = this.value;
+        });
+        
+        // Aggiorna UI in base alla modalità
+        modeSelect.addEventListener('change', updateUI);
+        seedSelect.addEventListener('change', updateSeedUI);
+        
+        function updateUI() {
+            const mode = modeSelect.value;
+            
+            // Mostra/nascondi gruppo seed in base alla modalità
+            if (mode === 'refine' || mode === 'sample') {
+                seedGroup.classList.remove('hidden');
+            } else {
+                seedGroup.classList.add('hidden');
+            }
+            
+            // Mostra/nascondi gruppo parametri personalizzati in base alla modalità
+            if (mode === 'standard' || mode === 'refine') {
+                customParamsGroup.classList.remove('hidden');
+            } else {
+                customParamsGroup.classList.add('hidden');
+            }
+            
+            // Aggiorna UI del seed
+            updateSeedUI();
+        }
+        
+        function updateSeedUI() {
+            // Mostra/nascondi input del seed personalizzato
+            if (seedSelect.value === 'custom') {
+                customSeedGroup.classList.remove('hidden');
+            } else {
+                customSeedGroup.classList.add('hidden');
+            }
+        }
+        
+        // Inizializza UI
+        updateUI();
+        
+        // Gestione selezione immagini
+        dropZone.addEventListener('click', function() {
+            fileInput.click();
+        });
+        
+        fileInput.addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                selectedImages = Array.from(e.target.files);
+                imageCount.textContent = selectedImages.length;
+                
+                // Mostra il container delle immagini selezionate
+                selectedImagesContainer.classList.remove('hidden');
+                
+                // Pulisci la griglia di anteprima
+                imagePreviewGrid.innerHTML = '';
+                imageElements = [];
+                
+                // Crea anteprime e carica immagini
+                let imagesLoaded = 0;
+                
+                selectedImages.forEach((file, index) => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        // Crea elemento anteprima
+                        const previewItem = document.createElement('div');
+                        previewItem.className = 'preview-item';
+                        
+                        const img = document.createElement('img');
+                        img.src = e.target.result;
+                        img.alt = file.name;
+                        
+                        // Aggiunge anteprima al DOM
+                        previewItem.appendChild(img);
+                        imagePreviewGrid.appendChild(previewItem);
+                        
+                        // Prepara immagine per elaborazione
+                        const fullImg = new Image();
+                        fullImg.onload = function() {
+                            imageElements[index] = fullImg;
+                            imagesLoaded++;
+                            
+                            // Abilita il pulsante quando tutte le immagini sono caricate
+                            if (imagesLoaded === selectedImages.length) {
+                                proceedButton.disabled = false;
+                            }
+                        };
+                        fullImg.src = e.target.result;
+                    };
+                    
+                    reader.readAsDataURL(file);
+                });
+            }
+        });
+        
+        // Procedi con l'elaborazione
+        proceedButton.addEventListener('click', function() {
+            if (selectedImages.length === 0) {
+                alert('Seleziona almeno un\'immagine');
+                return;
+            }
+            
+            uploadCard.classList.add('hidden');
+            optionsCard.classList.remove('hidden');
+        });
+        
+        // Elabora immagini
+        processButton.addEventListener('click', function() {
+            if (imageElements.length === 0) {
+                alert('Nessuna immagine disponibile');
+                return;
+            }
+            
+            optionsCard.classList.add('hidden');
+            processingCard.classList.remove('hidden');
+            
+            // Ottieni parametri
+            const mode = modeSelect.value;
+            
+            // Ottieni il seed
+            let seed = null;
+            if ((mode === 'refine' || mode === 'sample') && seedSelect.value === 'custom') {
+                seed = parseInt(seedInput.value);
+                if (isNaN(seed)) {
+                    seed = Math.floor(Math.random() * 1000000);
+                }
+            } else {
+                seed = Math.floor(Math.random() * 1000000);
+            }
+            
+            // Parametri personalizzati
+            const params = {};
+            if (mode === 'standard' || mode === 'refine') {
+                params.focusRatio = parseFloat(focusRatio.value);
+                params.blurStrength = parseFloat(blurStrength.value);
+                params.randomness = parseFloat(randomness.value);
+                params.ghostThreshold = parseFloat(ghostThreshold.value);
+            } else {
+                // Parametri predefiniti per altre modalità
+                params.focusRatio = 0.3;
+                params.blurStrength = 0.7;
+                params.randomness = 0.5;
+                params.ghostThreshold = 0.5;
+            }
+            
+            // Reset risultati
+            processedResults = [];
+            
+            // Elaborazione in base alla modalità
+            if (mode === 'standard' || mode === 'refine') {
+                processingStatus.textContent = 'Elaborazione in corso...';
+                
+                // Crea risultato single
+                setTimeout(() => {
+                    processedResults.push(processImages(imageElements, seed, params));
+                    displayResults();
+                }, 500);
+            } 
+            else if (mode === 'explore') {
+                // Genera 4 varianti con seed diversi
+                for (let i = 0; i < 4; i++) {
+                    const currentSeed = seed + i;
+                    
+                    setTimeout(() => {
+                        processingStatus.textContent = `Esplorando variante ${i+1}/4...`;
+                        processedResults.push(processImages(imageElements, currentSeed, params));
+                        
+                        if (processedResults.length === 4) {
+                            displayResults();
+                        }
+                    }, 500 * (i + 1));
+                }
+            } 
+            else if (mode === 'sample') {
+                // Genera 6 varianti artistiche con lo stesso seed
+                const presets = [
+                    {name: "SoftFocus", focusRatio: 0.2, blurStrength: 0.5, randomness: 0.3, ghostThreshold: 0.4},
+                    {name: "DreamyBlur", focusRatio: 0.3, blurStrength: 0.8, randomness: 0.6, ghostThreshold: 0.5},
+                    {name: "VividCenter", focusRatio: 0.4, blurStrength: 0.9, randomness: 0.4, ghostThreshold: 0.6},
+                    {name: "DynamicFocus", focusRatio: 0.5, blurStrength: 0.7, randomness: 0.7, ghostThreshold: 0.3},
+                    {name: "SmoothEdge", focusRatio: 0.6, blurStrength: 0.6, randomness: 0.5, ghostThreshold: 0.4},
+                    {name: "CreativeBlend", focusRatio: 0.7, blurStrength: 0.5, randomness: 0.8, ghostThreshold: 0.2}
+                ];
+                
+                for (let i = 0; i < presets.length; i++) {
+                    setTimeout(() => {
+                        processingStatus.textContent = `Creando variante artistica ${i+1}/${presets.length}...`;
+                        processedResults.push(processImages(imageElements, seed, presets[i], presets[i].name));
+                        
+                        if (processedResults.length === presets.length) {
+                            displayResults();
+                        }
+                    }, 500 * (i + 1));
+                }
+            }
+        });
+        
+        // Funzione principale per elaborare le immagini
+        function processImages(images, seed, params, effectName = null) {
+            // Usa un canvas per l'elaborazione
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Usa la prima immagine come base per le dimensioni
+            const baseImage = images[0];
+            
+            // Limita le dimensioni per performance (max 1200px)
+            const maxDimension = 1200;
+            let width = baseImage.width;
+            let height = baseImage.height;
+            
+            if (width > maxDimension || height > maxDimension) {
+                if (width > height) {
+                    height = Math.round(height * (maxDimension / width));
+                    width = maxDimension;
+                } else {
+                    width = Math.round(width * (maxDimension / height));
+                    height = maxDimension;
+                }
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            // Se c'è una sola immagine, applica semplice effetto di sfocatura selettiva
+            if (images.length === 1) {
+                return applySingleImageEffect(images[0], canvas, ctx, seed, params, effectName);
+            }
+            
+            // Altrimenti, applica stacking di immagini
+            return applyImageStacking(images, canvas, ctx, seed, params, effectName);
+        }
+        
+        // Effetto per una singola immagine
+        function applySingleImageEffect(image, canvas, ctx, seed, params, effectName = null) {
+            // Parametri
+            const {focusRatio, blurStrength, randomness, ghostThreshold} = params;
+            
+            // Inizializza generatore di numeri casuali con seed
+            const seededRandom = new SeededRandom(seed);
+            
+            // Disegna l'immagine originale
+            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            
+            // Crea una copia sfocata
+            const blurredCanvas = document.createElement('canvas');
+            blurredCanvas.width = canvas.width;
+            blurredCanvas.height = canvas.height;
+            const blurredCtx = blurredCanvas.getContext('2d');
+            blurredCtx.drawImage(image, 0, 0, canvas.width, canvas.height);
+            
+            // Applica sfocatura
+            const blurredData = blurredCtx.getImageData(0, 0, blurredCanvas.width, blurredCanvas.height);
+            const blurRadius = Math.max(1, Math.floor(20 * blurStrength));
+            gaussianBlur(blurredData, blurRadius);
+            blurredCtx.putImageData(blurredData, 0, 0);
+            
+            // Crea maschera di focus
+            const maskCanvas = document.createElement('canvas');
+            maskCanvas.width = canvas.width;
+            maskCanvas.height = canvas.height;
+            const maskCtx = maskCanvas.getContext('2d');
+            
+            // Imposta posizione centrale con randomizzazione
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            
+            // Aggiungi randomizzazione al centro
+            const offsetX = randomness > 0 ? 
+                (seededRandom.random() * 2 - 1) * canvas.width * 0.2 * randomness : 0;
+            const offsetY = randomness > 0 ? 
+                (seededRandom.random() * 2 - 1) * canvas.height * 0.2 * randomness : 0;
+            
+            const actualCenterX = centerX + offsetX;
+            const actualCenterY = centerY + offsetY;
+            
+            // Calcola dimensione dell'area a fuoco
+            const focusSize = Math.min(canvas.width, canvas.height) * (1.0 - focusRatio * 0.8);
+            
+            // Crea un gradiente radiale per la maschera
+            const gradient = maskCtx.createRadialGradient(
+                actualCenterX, actualCenterY, 0,
+                actualCenterX, actualCenterY, focusSize / 2 + focusSize / 4
+            );
+            gradient.addColorStop(0, 'white');  // Area centrale (a fuoco)
+            gradient.addColorStop(0.6, 'white');
+            gradient.addColorStop(1, 'black');  // Bordi (sfocati)
+            
+            maskCtx.fillStyle = gradient;
+            maskCtx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Aggiungi casualità alla maschera
+            if (randomness > 0) {
+                const maskData = maskCtx.getImageData(0, 0, canvas.width, canvas.height);
+                const pixels = maskData.data;
+                
+                for (let i = 0; i < pixels.length; i += 4) {
+                    // Aggiungi rumore solo al canale alpha
+                    const noise = (seededRandom.random() * 2 - 1) * 30 * randomness;
+                    pixels[i] = Math.max(0, Math.min(255, pixels[i] + noise));
+                    pixels[i+1] = Math.max(0, Math.min(255, pixels[i+1] + noise));
+                    pixels[i+2] = Math.max(0, Math.min(255, pixels[i+2] + noise));
+                }
+                
+                maskCtx.putImageData(maskData, 0, 0);
+            }
+            
+            // Combina originale e sfocata usando la maschera
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+            
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.drawImage(maskCanvas, 0, 0);
+            
+            ctx.globalCompositeOperation = 'destination-over';
+            ctx.drawImage(blurredCanvas, 0, 0);
+            
+            ctx.globalCompositeOperation = 'source-over';
+            
+            // Aggiungi effetto "ghost" se richiesto
+            if (ghostThreshold > 0) {
+                applyGhostEffect(ctx, canvas.width, canvas.height, maskCanvas, ghostThreshold);
+            }
+            
+            // Crea un nome file appropriato nel formato originale
+            const fileNameBase = selectedImages[0].name.split('.')[0];
+            const effectPart = effectName ? `-${effectName}` : '';
+            return {
+                src: canvas.toDataURL('image/jpeg', 0.9),
+                name: `${fileNameBase}${effectPart}-fr${params.focusRatio}-bs${params.blurStrength}-r${params.randomness}-gt${params.ghostThreshold}-${seed}.jpg`
+            };
+        }
+        
+        // Effetto per stacking di multiple immagini
+        function applyImageStacking(images, canvas, ctx, seed, params, effectName = null) {
+            // Parametri
+            const {focusRatio, blurStrength, randomness, ghostThreshold} = params;
+            
+            // Inizializza generatore di numeri casuali con seed
+            const seededRandom = new SeededRandom(seed);
+            
+            // Crea maschera base per il focus
+            const maskCanvas = document.createElement('canvas');
+            maskCanvas.width = canvas.width;
+            maskCanvas.height = canvas.height;
+            const maskCtx = maskCanvas.getContext('2d');
+            
+            // Imposta posizione centrale con randomizzazione
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            
+            // Aggiungi randomizzazione al centro
+            const offsetX = randomness > 0 ? 
+                (seededRandom.random() * 2 - 1) * canvas.width * 0.2 * randomness : 0;
+            const offsetY = randomness > 0 ? 
+                (seededRandom.random() * 2 - 1) * canvas.height * 0.2 * randomness : 0;
+            
+            const actualCenterX = centerX + offsetX;
+            const actualCenterY = centerY + offsetY;
+            
+            // Calcola dimensione dell'area a fuoco
+            const focusSize = Math.min(canvas.width, canvas.height) * (1.0 - focusRatio * 0.8);
+            
+            // Disegna un cerchio come area di focus
+            maskCtx.fillStyle = 'black';
+            maskCtx.fillRect(0, 0, canvas.width, canvas.height);
+maskCtx.fillStyle = 'white';
+            maskCtx.beginPath();
+            maskCtx.arc(actualCenterX, actualCenterY, focusSize/2, 0, Math.PI * 2);
+            maskCtx.fill();
+            
+            // Sfuma i bordi della maschera
+            const blurAmount = Math.floor(focusSize * 0.1);
+            blurMask(maskCtx, maskCanvas.width, maskCanvas.height, blurAmount);
+            
+            // Inizializza canvas per risultato finale
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Elabora ogni immagine nello stack
+            for (let i = 0; i < images.length; i++) {
+                const img = images[i];
+                
+                // Crea variante della maschera per questa immagine
+                const currentMask = document.createElement('canvas');
+                currentMask.width = canvas.width;
+                currentMask.height = canvas.height;
+                const currentMaskCtx = currentMask.getContext('2d');
+                
+                // Inizia con la maschera base
+                currentMaskCtx.drawImage(maskCanvas, 0, 0);
+                
+                // Aggiungi variazioni alla maschera per immagini dopo la prima
+                if (i > 0 && randomness > 0) {
+                    // Applica spostamento casuale
+                    const maskOffsetX = (seededRandom.random() * 2 - 1) * canvas.width * 0.1 * randomness;
+                    const maskOffsetY = (seededRandom.random() * 2 - 1) * canvas.height * 0.1 * randomness;
+                    
+                    // Pulisci e ridisegna con offset
+                    currentMaskCtx.clearRect(0, 0, currentMask.width, currentMask.height);
+                    currentMaskCtx.drawImage(maskCanvas, maskOffsetX, maskOffsetY);
+                    
+                    // Aggiungi rumore alla maschera
+                    const maskData = currentMaskCtx.getImageData(0, 0, currentMask.width, currentMask.height);
+                    const pixels = maskData.data;
+                    
+                    for (let p = 0; p < pixels.length; p += 4) {
+                        const noise = (seededRandom.random() * 2 - 1) * 30 * randomness;
+                        pixels[p] = Math.max(0, Math.min(255, pixels[p] + noise));
+                        pixels[p+1] = Math.max(0, Math.min(255, pixels[p+1] + noise));
+                        pixels[p+2] = Math.max(0, Math.min(255, pixels[p+2] + noise));
+                    }
+                    
+                    currentMaskCtx.putImageData(maskData, 0, 0);
+                }
+                
+                // Crea una versione sfocata dell'immagine
+                const blurredCanvas = document.createElement('canvas');
+                blurredCanvas.width = canvas.width;
+                blurredCanvas.height = canvas.height;
+                const blurredCtx = blurredCanvas.getContext('2d');
+                
+                // Disegna e sfoca l'immagine
+                blurredCtx.drawImage(img, 0, 0, blurredCanvas.width, blurredCanvas.height);
+                const blurredData = blurredCtx.getImageData(0, 0, blurredCanvas.width, blurredCanvas.height);
+                
+                // Intensità sfocatura aumenta per immagini successive
+                const blurRadius = Math.max(1, Math.floor(blurStrength * 10 * (i + 1) / images.length));
+                gaussianBlur(blurredData, blurRadius);
+                blurredCtx.putImageData(blurredData, 0, 0);
+                
+                // Crea canvas per l'immagine processata
+                const processedCanvas = document.createElement('canvas');
+                processedCanvas.width = canvas.width;
+                processedCanvas.height = canvas.height;
+                const processedCtx = processedCanvas.getContext('2d');
+                
+                // Disegna immagine originale
+                processedCtx.drawImage(img, 0, 0, processedCanvas.width, processedCanvas.height);
+                
+                // Usa la maschera per applicare sfocatura nelle aree appropriate
+                processedCtx.globalCompositeOperation = 'destination-out';
+                processedCtx.drawImage(currentMask, 0, 0);
+                
+                processedCtx.globalCompositeOperation = 'destination-over';
+                processedCtx.drawImage(blurredCanvas, 0, 0);
+                
+                processedCtx.globalCompositeOperation = 'source-over';
+                
+                // Aggiungi al risultato con opacità decrescente per stacking
+                if (i === 0) {
+                    // Prima immagine con opacità piena
+                    ctx.drawImage(processedCanvas, 0, 0);
+                } else {
+                    // Immagini successive con opacità decrescente
+                    const opacity = 1.0 - (i / images.length) * 0.4;
+                    ctx.globalAlpha = opacity;
+                    ctx.drawImage(processedCanvas, 0, 0);
+                    ctx.globalAlpha = 1.0;
+                }
+            }
+            
+            // Aggiungi effetto "ghost" se richiesto
+            if (ghostThreshold > 0) {
+                applyGhostEffect(ctx, canvas.width, canvas.height, maskCanvas, ghostThreshold);
+            }
+            
+            // Crea un nome file appropriato nel formato originale
+            const stackFileNameBase = selectedImages[0].name.split('.')[0];
+            const effectPart = effectName ? `-${effectName}` : '';
+            return {
+                src: canvas.toDataURL('image/jpeg', 0.9),
+                name: `${stackFileNameBase}-stack${images.length}${effectPart}-fr${params.focusRatio}-bs${params.blurStrength}-r${params.randomness}-gt${params.ghostThreshold}-${seed}.jpg`
+            };
+        }
+        
+        // Funzione per applicare effetto "ghost" (desaturazione nelle aree sfocate)
+        function applyGhostEffect(ctx, width, height, maskCanvas, threshold) {
+            // Ottieni i dati dell'immagine
+            const imageData = ctx.getImageData(0, 0, width, height);
+            const pixels = imageData.data;
+            
+            // Ottieni i dati della maschera
+            const maskCtx = maskCanvas.getContext('2d');
+            const maskData = maskCtx.getImageData(0, 0, width, height).data;
+            
+            // Applica effetto ghost
+            for (let i = 0; i < pixels.length; i += 4) {
+                // Normalizza valore maschera a 0-1
+                const maskValue = maskData[i] / 255;
+                
+                // Applica effetto solo dove maschera è sotto soglia (aree sfocate)
+                if (maskValue < threshold) {
+                    // Calcola intensità effetto
+                    const effect = (threshold - maskValue) / threshold * 0.7;
+                    
+                    // Calcola valore grigio (media RGB)
+                    const gray = (pixels[i] + pixels[i+1] + pixels[i+2]) / 3;
+                    
+                    // Applica desaturazione parziale
+                    pixels[i] = pixels[i] * (1 - effect) + gray * effect;
+                    pixels[i+1] = pixels[i+1] * (1 - effect) + gray * effect;
+                    pixels[i+2] = pixels[i+2] * (1 - effect) + gray * effect;
+                    
+                    // Aggiungi leggera tonalità blu
+                    pixels[i+2] = Math.min(255, pixels[i+2] * 1.1);
+                }
+            }
+            
+            // Aggiorna l'immagine
+            ctx.putImageData(imageData, 0, 0);
+        }
+        
+        // Funzione per applicare sfocatura a una maschera
+        function blurMask(ctx, width, height, radius) {
+            const imageData = ctx.getImageData(0, 0, width, height);
+            gaussianBlur(imageData, radius);
+            ctx.putImageData(imageData, 0, 0);
+        }
+        
+        // Implementazione di sfocatura gaussiana
+        function gaussianBlur(imageData, radius) {
+            const pixels = imageData.data;
+            const width = imageData.width;
+            const height = imageData.height;
+            
+            // Crea un array per i dati temporanei
+            const tmpPixels = new Uint8ClampedArray(pixels.length);
+            
+            // Blur orizzontale
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    let r = 0, g = 0, b = 0, a = 0, count = 0;
+                    
+                    // Somma dei valori dei pixel nell'area del kernel
+                    for (let kx = -radius; kx <= radius; kx++) {
+                        const px = x + kx;
+                        if (px < 0 || px >= width) continue;
+                        
+                        const i = (y * width + px) * 4;
+                        r += pixels[i];
+                        g += pixels[i + 1];
+                        b += pixels[i + 2];
+                        a += pixels[i + 3];
+                        count++;
+                    }
+                    
+                    // Calcola la media
+                    const i = (y * width + x) * 4;
+                    tmpPixels[i] = r / count;
+                    tmpPixels[i + 1] = g / count;
+                    tmpPixels[i + 2] = b / count;
+                    tmpPixels[i + 3] = a / count;
+                }
+            }
+            
+            // Blur verticale
+            for (let x = 0; x < width; x++) {
+                for (let y = 0; y < height; y++) {
+                    let r = 0, g = 0, b = 0, a = 0, count = 0;
+                    
+                    // Somma dei valori dei pixel nell'area del kernel
+                    for (let ky = -radius; ky <= radius; ky++) {
+                        const py = y + ky;
+                        if (py < 0 || py >= height) continue;
+                        
+                        const i = (py * width + x) * 4;
+                        r += tmpPixels[i];
+                        g += tmpPixels[i + 1];
+                        b += tmpPixels[i + 2];
+                        a += tmpPixels[i + 3];
+                        count++;
+                    }
+                    
+                    // Calcola la media
+                    const i = (y * width + x) * 4;
+                    pixels[i] = r / count;
+                    pixels[i + 1] = g / count;
+                    pixels[i + 2] = b / count;
+                    pixels[i + 3] = a / count;
+                }
+            }
+            
+            return imageData;
+        }
+        
+        // Classe per generazione numeri pseudocasuali con seed
+        class SeededRandom {
+            constructor(seed) {
+                this.seed = seed % 2147483647;
+                if (this.seed <= 0) this.seed += 2147483646;
+            }
+            
+            random() {
+                this.seed = (this.seed * 16807) % 2147483647;
+                return (this.seed - 1) / 2147483646;
+            }
+        }
+        
+        // Mostra i risultati
+        function displayResults() {
+            // Nascondi scheda elaborazione
+            processingCard.classList.add('hidden');
+            
+            // Mostra scheda risultati
+            resultsCard.classList.remove('hidden');
+            
+            // Pulisci container risultati
+            results.innerHTML = '';
+            
+            // Aggiungi ogni risultato
+            processedResults.forEach((result, i) => {
+                const resultItem = document.createElement('div');
+                resultItem.className = 'result-item';
+                
+                const img = document.createElement('img');
+                img.src = result.src;
+                img.alt = `Risultato ${i+1}`;
+                
+                const actions = document.createElement('div');
+                actions.className = 'result-actions';
+                
+                const saveBtn = document.createElement('button');
+                saveBtn.textContent = 'Salva';
+                saveBtn.addEventListener('click', function() {
+                    saveImage(result.src, result.name);
+                });
+                
+                actions.appendChild(saveBtn);
+                resultItem.appendChild(img);
+                resultItem.appendChild(actions);
+                results.appendChild(resultItem);
+            });
+        }
+        
+        // Funzione per salvare un'immagine
+        function saveImage(src, filename) {
+            const link = document.createElement('a');
+            link.href = src;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // Salva tutte le immagini
+        saveAllButton.addEventListener('click', function() {
+            processedResults.forEach(result => {
+                saveImage(result.src, result.name);
+            });
+        });
+        
+        // Torna alla selezione immagini
+        newImagesButton.addEventListener('click', function() {
+            resultsCard.classList.add('hidden');
+            uploadCard.classList.remove('hidden');
+            
+            // Reset
+            selectedImages = [];
+            imageElements = [];
+            processedResults = [];
+            fileInput.value = '';
+            selectedImagesContainer.classList.add('hidden');
+            imagePreviewGrid.innerHTML = '';
+        });
+        
+        // Registra service worker per PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(function(registration) {
+                        console.log('Service Worker registrato');
+                    })
+                    .catch(function(error) {
+                        console.log('Errore registrazione Service Worker: ', error);
+                    });
+            });
+        }
+    </script>
+</body>
+</html>
