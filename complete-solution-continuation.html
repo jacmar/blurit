@@ -1,0 +1,312 @@
+maskCtx.arc(actualCenterX, actualCenterY, focusSize/2, 0, Math.PI * 2);
+            maskCtx.fill();
+            
+            // Sfuma i bordi della maschera
+            const blurAmount = Math.floor(focusSize * 0.1);
+            blurMask(maskCtx, maskCanvas.width, maskCanvas.height, blurAmount);
+            
+            // Inizializza canvas per risultato finale
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Elabora ogni immagine nello stack
+            for (let i = 0; i < images.length; i++) {
+                const img = images[i];
+                
+                // Crea variante della maschera per questa immagine
+                const currentMask = document.createElement('canvas');
+                currentMask.width = canvas.width;
+                currentMask.height = canvas.height;
+                const currentMaskCtx = currentMask.getContext('2d');
+                
+                // Inizia con la maschera base
+                currentMaskCtx.drawImage(maskCanvas, 0, 0);
+                
+                // Aggiungi variazioni alla maschera per immagini dopo la prima
+                if (i > 0 && randomness > 0) {
+                    // Applica spostamento casuale
+                    const maskOffsetX = (seededRandom.random() * 2 - 1) * canvas.width * 0.1 * randomness;
+                    const maskOffsetY = (seededRandom.random() * 2 - 1) * canvas.height * 0.1 * randomness;
+                    
+                    // Pulisci e ridisegna con offset
+                    currentMaskCtx.clearRect(0, 0, currentMask.width, currentMask.height);
+                    currentMaskCtx.drawImage(maskCanvas, maskOffsetX, maskOffsetY);
+                    
+                    // Aggiungi rumore alla maschera
+                    const maskData = currentMaskCtx.getImageData(0, 0, currentMask.width, currentMask.height);
+                    const pixels = maskData.data;
+                    
+                    for (let p = 0; p < pixels.length; p += 4) {
+                        const noise = (seededRandom.random() * 2 - 1) * 30 * randomness;
+                        pixels[p] = Math.max(0, Math.min(255, pixels[p] + noise));
+                        pixels[p+1] = Math.max(0, Math.min(255, pixels[p+1] + noise));
+                        pixels[p+2] = Math.max(0, Math.min(255, pixels[p+2] + noise));
+                    }
+                    
+                    currentMaskCtx.putImageData(maskData, 0, 0);
+                }
+                
+                // Crea una versione sfocata dell'immagine
+                const blurredCanvas = document.createElement('canvas');
+                blurredCanvas.width = canvas.width;
+                blurredCanvas.height = canvas.height;
+                const blurredCtx = blurredCanvas.getContext('2d');
+                
+                // Disegna e sfoca l'immagine
+                blurredCtx.drawImage(img, 0, 0, blurredCanvas.width, blurredCanvas.height);
+                const blurredData = blurredCtx.getImageData(0, 0, blurredCanvas.width, blurredCanvas.height);
+                
+                // Intensità sfocatura aumenta per immagini successive
+                const blurRadius = Math.max(1, Math.floor(blurStrength * 10 * (i + 1) / images.length));
+                gaussianBlur(blurredData, blurRadius);
+                blurredCtx.putImageData(blurredData, 0, 0);
+                
+                // Crea canvas per l'immagine processata
+                const processedCanvas = document.createElement('canvas');
+                processedCanvas.width = canvas.width;
+                processedCanvas.height = canvas.height;
+                const processedCtx = processedCanvas.getContext('2d');
+                
+                // Disegna immagine originale
+                processedCtx.drawImage(img, 0, 0, processedCanvas.width, processedCanvas.height);
+                
+                // Usa la maschera per applicare sfocatura nelle aree appropriate
+                processedCtx.globalCompositeOperation = 'destination-out';
+                processedCtx.drawImage(currentMask, 0, 0);
+                
+                processedCtx.globalCompositeOperation = 'destination-over';
+                processedCtx.drawImage(blurredCanvas, 0, 0);
+                
+                processedCtx.globalCompositeOperation = 'source-over';
+                
+                // Aggiungi al risultato con opacità decrescente per stacking
+                if (i === 0) {
+                    // Prima immagine con opacità piena
+                    ctx.drawImage(processedCanvas, 0, 0);
+                } else {
+                    // Immagini successive con opacità decrescente
+                    const opacity = 1.0 - (i / images.length) * 0.4;
+                    ctx.globalAlpha = opacity;
+                    ctx.drawImage(processedCanvas, 0, 0);
+                    ctx.globalAlpha = 1.0;
+                }
+            }
+            
+            // Aggiungi effetto "ghost" se richiesto
+            if (ghostThreshold > 0) {
+                applyGhostEffect(ctx, canvas.width, canvas.height, maskCanvas, ghostThreshold);
+            }
+            
+            // Crea un nome file appropriato nel formato originale
+            const stackFileNameBase = selectedImages[0].name.split('.')[0];
+            const effectPart = effectName ? `-${effectName}` : '';
+            return {
+                src: canvas.toDataURL('image/jpeg', 0.9),
+                name: `${stackFileNameBase}-stack${images.length}${effectPart}-fr${params.focusRatio}-bs${params.blurStrength}-r${params.randomness}-gt${params.ghostThreshold}-${seed}.jpg`
+            };
+        }
+        
+        // Funzione per applicare effetto "ghost" (desaturazione nelle aree sfocate)
+        function applyGhostEffect(ctx, width, height, maskCanvas, threshold) {
+            // Ottieni i dati dell'immagine
+            const imageData = ctx.getImageData(0, 0, width, height);
+            const pixels = imageData.data;
+            
+            // Ottieni i dati della maschera
+            const maskCtx = maskCanvas.getContext('2d');
+            const maskData = maskCtx.getImageData(0, 0, width, height).data;
+            
+            // Applica effetto ghost
+            for (let i = 0; i < pixels.length; i += 4) {
+                // Normalizza valore maschera a 0-1
+                const maskValue = maskData[i] / 255;
+                
+                // Applica effetto solo dove maschera è sotto soglia (aree sfocate)
+                if (maskValue < threshold) {
+                    // Calcola intensità effetto
+                    const effect = (threshold - maskValue) / threshold * 0.7;
+                    
+                    // Calcola valore grigio (media RGB)
+                    const gray = (pixels[i] + pixels[i+1] + pixels[i+2]) / 3;
+                    
+                    // Applica desaturazione parziale
+                    pixels[i] = pixels[i] * (1 - effect) + gray * effect;
+                    pixels[i+1] = pixels[i+1] * (1 - effect) + gray * effect;
+                    pixels[i+2] = pixels[i+2] * (1 - effect) + gray * effect;
+                    
+                    // Aggiungi leggera tonalità blu
+                    pixels[i+2] = Math.min(255, pixels[i+2] * 1.1);
+                }
+            }
+            
+            // Aggiorna l'immagine
+            ctx.putImageData(imageData, 0, 0);
+        }
+        
+        // Funzione per applicare sfocatura a una maschera
+        function blurMask(ctx, width, height, radius) {
+            const imageData = ctx.getImageData(0, 0, width, height);
+            gaussianBlur(imageData, radius);
+            ctx.putImageData(imageData, 0, 0);
+        }
+        
+        // Implementazione di sfocatura gaussiana
+        function gaussianBlur(imageData, radius) {
+            const pixels = imageData.data;
+            const width = imageData.width;
+            const height = imageData.height;
+            
+            // Crea un array per i dati temporanei
+            const tmpPixels = new Uint8ClampedArray(pixels.length);
+            
+            // Blur orizzontale
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    let r = 0, g = 0, b = 0, a = 0, count = 0;
+                    
+                    // Somma dei valori dei pixel nell'area del kernel
+                    for (let kx = -radius; kx <= radius; kx++) {
+                        const px = x + kx;
+                        if (px < 0 || px >= width) continue;
+                        
+                        const i = (y * width + px) * 4;
+                        r += pixels[i];
+                        g += pixels[i + 1];
+                        b += pixels[i + 2];
+                        a += pixels[i + 3];
+                        count++;
+                    }
+                    
+                    // Calcola la media
+                    const i = (y * width + x) * 4;
+                    tmpPixels[i] = r / count;
+                    tmpPixels[i + 1] = g / count;
+                    tmpPixels[i + 2] = b / count;
+                    tmpPixels[i + 3] = a / count;
+                }
+            }
+            
+            // Blur verticale
+            for (let x = 0; x < width; x++) {
+                for (let y = 0; y < height; y++) {
+                    let r = 0, g = 0, b = 0, a = 0, count = 0;
+                    
+                    // Somma dei valori dei pixel nell'area del kernel
+                    for (let ky = -radius; ky <= radius; ky++) {
+                        const py = y + ky;
+                        if (py < 0 || py >= height) continue;
+                        
+                        const i = (py * width + x) * 4;
+                        r += tmpPixels[i];
+                        g += tmpPixels[i + 1];
+                        b += tmpPixels[i + 2];
+                        a += tmpPixels[i + 3];
+                        count++;
+                    }
+                    
+                    // Calcola la media
+                    const i = (y * width + x) * 4;
+                    pixels[i] = r / count;
+                    pixels[i + 1] = g / count;
+                    pixels[i + 2] = b / count;
+                    pixels[i + 3] = a / count;
+                }
+            }
+            
+            return imageData;
+        }
+        
+        // Classe per generazione numeri pseudocasuali con seed
+        class SeededRandom {
+            constructor(seed) {
+                this.seed = seed % 2147483647;
+                if (this.seed <= 0) this.seed += 2147483646;
+            }
+            
+            random() {
+                this.seed = (this.seed * 16807) % 2147483647;
+                return (this.seed - 1) / 2147483646;
+            }
+        }
+        
+        // Mostra i risultati
+        function displayResults() {
+            // Nascondi scheda elaborazione
+            processingCard.classList.add('hidden');
+            
+            // Mostra scheda risultati
+            resultsCard.classList.remove('hidden');
+            
+            // Pulisci container risultati
+            results.innerHTML = '';
+            
+            // Aggiungi ogni risultato
+            processedResults.forEach((result, i) => {
+                const resultItem = document.createElement('div');
+                resultItem.className = 'result-item';
+                
+                const img = document.createElement('img');
+                img.src = result.src;
+                img.alt = `Risultato ${i+1}`;
+                
+                const actions = document.createElement('div');
+                actions.className = 'result-actions';
+                
+                const saveBtn = document.createElement('button');
+                saveBtn.textContent = 'Salva';
+                saveBtn.addEventListener('click', function() {
+                    saveImage(result.src, result.name);
+                });
+                
+                actions.appendChild(saveBtn);
+                resultItem.appendChild(img);
+                resultItem.appendChild(actions);
+                results.appendChild(resultItem);
+            });
+        }
+        
+        // Funzione per salvare un'immagine
+        function saveImage(src, filename) {
+            const link = document.createElement('a');
+            link.href = src;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // Salva tutte le immagini
+        saveAllButton.addEventListener('click', function() {
+            processedResults.forEach(result => {
+                saveImage(result.src, result.name);
+            });
+        });
+        
+        // Torna alla selezione immagini
+        newImagesButton.addEventListener('click', function() {
+            resultsCard.classList.add('hidden');
+            uploadCard.classList.remove('hidden');
+            
+            // Reset
+            selectedImages = [];
+            imageElements = [];
+            processedResults = [];
+            fileInput.value = '';
+            selectedImagesContainer.classList.add('hidden');
+            imagePreviewGrid.innerHTML = '';
+        });
+        
+        // Registra service worker per PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(function(registration) {
+                        console.log('Service Worker registrato');
+                    })
+                    .catch(function(error) {
+                        console.log('Errore registrazione Service Worker: ', error);
+                    });
+            });
+        }
+    </script>
+</body>
+</html>
