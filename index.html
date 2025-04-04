@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4285f4">
+    <title>Selective Focus</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #4285f4;
+            --primary-dark: #3367d6;
+            --text-color: #333;
+            --light-grey: #f5f5f5;
+            --border-color: #ddd;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Roboto', sans-serif;
+            color: var(--text-color);
+            background-color: var(--light-grey);
+            line-height: 1.6;
+        }
+        
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 500;
+        }
+        
+        main {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .card-title {
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            font-weight: 500;
+        }
+        
+        .upload-container {
+            border: 2px dashed var(--border-color);
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            transition: all 0.3s;
+        }
+        
+        .upload-container:hover {
+            background-color: rgba(66, 133, 244, 0.04);
+        }
+        
+        .upload-container p {
+            color: #666;
+            margin-top: 0.5rem;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.25rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: var(--primary-dark);
+        }
+        
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        select, input {
+            width: 100%;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 1rem;
+            background-color: white;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        
+        .parameter-group {
+            margin-bottom: 1rem;
+        }
+        
+        .results-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        
+        .result-item {
+            overflow: hidden;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+        }
+        
+        .result-item:hover {
+            transform: scale(1.03);
+        }
+        
+        .result-item img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        
+        .result-actions {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem;
+        }
+        
+        .result-actions button {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.9rem;
+        }
+        
+        .processing {
+            text-align: center;
+            padding: 2rem;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top: 4px solid var(--primary-color);
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 1rem auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Media queries for responsiveness */
+        @media (max-width: 600px) {
+            .results-container {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+            
+            .card {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>SELECTIVE FOCUS</h1>
+    </header>
+    
+    <main>
+        <div class="card" id="uploadCard">
+            <h2 class="card-title">Seleziona Immagine</h2>
+            <div class="upload-container" id="dropZone">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#4285f4" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <p>Trascina un'immagine qui o clicca per selezionare</p>
+            </div>
+            <input type="file" id="fileInput" accept="image/*">
+            <p id="selectedFileName" class="hidden"></p>
+        </div>
+        
+        <div class="card hidden" id="optionsCard">
+            <h2 class="card-title">Parametri di Elaborazione</h2>
+            
+            <div class="parameter-group">
+                <label for="modeSelect">Modalità di Elaborazione:</label>
+                <select id="modeSelect">
+                    <option value="standard">Standard - Singola immagine con parametri personalizzati</option>
+                    <option value="explore">Esplora - 4 varianti con seed diversi</option>
+                    <option value="sample">Sample - 6 varianti artistiche con stesso seed</option>
+                    <option value="refine">Refine - Seed specifico con parametri personalizzati</option>
+                </select>
+            </div>
+            
+            <div class="parameter-group" id="seedGroup">
+                <label for="seedSelect">Seed:</label>
+                <select id="seedSelect">
+                    <option value="random">Genera automaticamente</option>
+                    <option value="custom">Inserisci manualmente</option>
+                </select>
+                
+                <div id="customSeedGroup" class="hidden">
+                    <label for="seedInput">Inserisci seed (numero intero):</label>
+                    <input type="number" id="seedInput" placeholder="Es. 42">
+                </div>
+            </div>
+            
+            <div id="customParamsGroup">
+                <h3 class="card-title">Parametri Personalizzati</h3>
+                
+                <div class="parameter-group">
+                    <label for="focusRatio">Focus Ratio (0.1-0.9):</label>
+                    <input type="range" id="focusRatio" min="0.1" max="0.9" step="0.05" value="0.3">
+                    <span id="focusRatioValue">0.3</span>
+                </div>
+                
+                <div class="parameter-group">
+                    <label for="blurStrength">Blur Strength (0.1-1.0):</label>
+                    <input type="range" id="blurStrength" min="0.1" max="1.0" step="0.05" value="0.7">
+                    <span id="blurStrengthValue">0.7</span>
+                </div>
+                
+                <div class="parameter-group">
+                    <label for="randomness">Randomness (0.0-1.0):</label>
+                    <input type="range" id="randomness" min="0" max="1.0" step="0.05" value="0.5">
+                    <span id="randomnessValue">0.5</span>
+                </div>
+                
+                <div class="parameter-group">
+                    <label for="ghostThreshold">Ghost Threshold (0.0-1.0):</label>
+                    <input type="range" id="ghostThreshold" min="0" max="1.0" step="0.05" value="0.5">
+                    <span id="ghostThresholdValue">0.5</span>
+                </div>
+            </div>
+            
+            <button id="processButton">Elabora Immagine</button>
+        </div>
+        
+        <div class="card hidden" id="processingCard">
+            <div class="processing">
+                <h2 class="card-title">Elaborazione in corso...</h2>
+                <div class="spinner"></div>
+                <p>L'elaborazione può richiedere alcuni secondi</p>
+            </div>
+        </div>
+        
+        <div class="card hidden" id="resultsCard">
+            <h2 class="card-title">Risultati</h2>
+            <div class="results-container" id="resultsContainer">
+                <!-- I risultati verranno inseriti qui dinamicamente -->
+            </div>
+            <button id="newImageButton" style="margin-top: 1rem;">Elabora una nuova immagine</button>
+        </div>
+    </main>
+    
+    <script>
+        // Registrazione del Service Worker per la PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Service Worker registrato'))
+                    .catch(err => console.log('Errore nella registrazione del Service Worker', err));
+            });
+        }
+        
+        // Riferimenti agli elementi del DOM
+        const fileInput = document.getElementById('fileInput');
+        const dropZone = document.getElementById('dropZone');
+        const selectedFileName = document.getElementById('selectedFileName');
+        const uploadCard = document.getElementById('uploadCard');
+        const optionsCard = document.getElementById('optionsCard');
+        const processingCard = document.getElementById('processingCard');
+        const resultsCard = document.getElementById('resultsCard');
+        const modeSelect = document.getElementById('modeSelect');
+        const seedGroup = document.getElementById('seedGroup');
+        const seedSelect = document.getElementById('seedSelect');
+        const customSeedGroup = document.getElementById('customSeedGroup');
+        const seedInput = document.getElementById('seedInput');
+        const customParamsGroup = document.getElementById('customParamsGroup');
+        const processButton = document.getElementById('processButton');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const newImageButton = document.getElementById('newImageButton');
+        
+        // Sliders per i parametri
+        const focusRatio = document.getElementById('focusRatio');
+        const blurStrength = document.getElementById('blurStrength');
+        const randomness = document.getElementById('randomness');
+        const ghostThreshold = document.getElementById('ghostThreshold');
+        const focusRatioValue = document.getElementById('focusRatioValue');
+        const blurStrengthValue = document.getElementById('blurStrengthValue');
+        const randomnessValue = document.getElementById('randomnessValue');
+        const ghostThresholdValue = document.getElementById('ghostThresholdValue');
+        
+        // Aggiornamento valore sliders
+        focusRatio.addEventListener('input', () => {
+            focusRatioValue.textContent = focusRatio.value;
+        });
+        
+        blurStrength.addEventListener('input', () => {
+            blurStrengthValue.textContent = blurStrength.value;
+        });
+        
+        randomness.addEventListener('input', () => {
+            randomnessValue.textContent = randomness.value;
+        });
+        
+        ghostThreshold.addEventListener('input', () => {
+            ghostThresholdValue.textContent = ghostThreshold.value;
+        });
+        
+        // Gestione del file upload
+        dropZone.addEventListener('click', () => {
+            fileInput.click();
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (fileInput.files.length > 0) {
+                handleFileSelection(fileInput.files[0]);
+            }
+        });
+        
+        // Gestione del drag and drop
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.style.backgroundColor = 'rgba(66, 133, 244, 0.1)';
+        });
+        
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.style.backgroundColor = '';
+        });
+        
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.backgroundColor = '';
+            
+            if (e.dataTransfer.files.length > 0) {
+                handleFileSelection(e.dataTransfer.files[0]);
+            }
+        });
+        
+        function handleFileSelection(file) {
+            if (!file.type.match('image.*')) {
+                alert('Per favore seleziona un file immagine valido');
+                return;
+            }
+            
+            selectedFileName.textContent = `File selezionato: ${file.name}`;
+            selectedFileName.classList.remove('hidden');
+            
+            // Passa alla schermata dei parametri
+            uploadCard.classList.add('hidden');
+            optionsCard.classList.remove('hidden');
+            
+            // Salva il riferimento al file in una variabile globale
+            window.selectedFile = file;
+        }
+        
+        // Gestione della modalità e visualizzazione opzioni
+        modeSelect.addEventListener('change', updateUI);
+        seedSelect.addEventListener('change', updateUI);
+        
+        function updateUI() {
+            const mode = modeSelect.value;
+            
+            // Mostra/nascondi gruppo seed in base alla modalità
+            if (mode === 'refine' || mode === 'sample') {
+                seedGroup.classList.remove('hidden');
+            } else {
+                seedGroup.classList.add('hidden');
+            }
+            
+            // Mostra/nascondi gruppo parametri personalizzati in base alla modalità
+            if (mode === 'standard' || mode === 'refine') {
+                customParamsGroup.classList.remove('hidden');
+            } else {
+                customParamsGroup.classList.add('hidden');
+            }
+            
+            // Mostra/nascondi input seed manuale
+            if (seedSelect.value === 'custom') {
+                customSeedGroup.classList.remove('hidden');
+            } else {
+                customSeedGroup.classList.add('hidden');
+            }
+        }
+        
+        // Chiamata iniziale per impostare la UI
+        updateUI();
+        
+        // Gestione dell'elaborazione
+        processButton.addEventListener('click', () => {
+            if (!window.selectedFile) {
+                alert('Seleziona prima un file immagine');
+                return;
+            }
+            
+            // Mostra la schermata di elaborazione
+            optionsCard.classList.add('hidden');
+            processingCard.classList.remove('hidden');
+            
+            // Prepara i parametri per l'invio
+            const mode = modeSelect.value;
+            let seed = null;
+            
+            if ((mode === 'refine' || mode === 'sample') && seedSelect.value === 'custom') {
+                seed = parseInt(seedInput.value);
+                if (isNaN(seed)) {
+                    alert('Inserisci un numero valido come seed');
+                    optionsCard.classList.remove('hidden');
+                    processingCard.classList.add('hidden');
+                    return;
+                }
+            }
+            
+            let parameters = {};
+            if (mode === 'standard' || mode === 'refine') {
+                parameters = {
+                    focus_ratio: parseFloat(focusRatio.value),
+                    blur_strength: parseFloat(blurStrength.value),
+                    randomness: parseFloat(randomness.value),
+                    ghost_threshold: parseFloat(ghostThreshold.value)
+                };
+            }
+            
+            // Carica l'immagine su Cloud Storage e avvia l'elaborazione
+            uploadImageAndProcess(window.selectedFile, mode, seed, parameters);
+        });
+        
+        async function uploadImageAndProcess(file, mode, seed, parameters) {
+            try {
+                // 1. Ottieni un URL firmato per caricare il file
+                const response = await fetch('/get-upload-url', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        fileName: file.name,
+                        contentType: file.type
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // 2. Carica il file su Cloud Storage
+                await fetch(data.uploadUrl, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': file.type
+                    },
+                    body: file
+                });
+                
+                // 3. Avvia l'elaborazione
+                const processResponse = await fetch('/process', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        image_path: data.imagePath,
+                        mode: mode,
+                        seed: seed,
+                        parameters: parameters
+                    })
+                });
+                
+                const processData = await processResponse.json();
+                
+                // 4. Mostra i risultati
+                displayResults(processData.result_urls);
+                
+            } catch (error) {
+                console.error('Errore durante l\'elaborazione:', error);
+                alert('Si è verificato un errore. Riprova.');
+                processingCard.classList.add('hidden');
+                optionsCard.classList.remove('hidden');
+            }
+        }
+        
+        function displayResults(resultUrls) {
+            // Nascondi la schermata di elaborazione e mostra i risultati
+            processingCard.classList.add('hidden');
+            resultsCard.classList.remove('hidden');
+            
+            // Svuota il container dei risultati
+            resultsContainer.innerHTML = '';
+            
+            // Popola con le immagini risultanti
+            resultUrls.forEach(url => {
+                const resultItem = document.createElement('div');
+                resultItem.className = 'result-item';
+                
+                const img = document.createElement('img');
+                img.src = url;
+                img.alt = 'Immagine elaborata';
+                
+                const actions = document.createElement('div');
+                actions.className = 'result-actions';
+                
+                const downloadBtn = document.createElement('button');
+                downloadBtn.textContent = 'Scarica';
+                downloadBtn.addEventListener('click', () => {
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'selective-focus-' + new Date().getTime() + '.jpg';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                });
+                
+                actions.appendChild(downloadBtn);
+                resultItem.appendChild(img);
+                resultItem.appendChild(actions);
+                resultsContainer.appendChild(resultItem);
+            });
+        }
+        
+        // Pulsante per iniziare una nuova elaborazione
+        newImageButton.addEventListener('click', () => {
+            resultsCard.classList.add('hidden');
+            uploadCard.classList.remove('hidden');
+            
+            // Reset dei form
+            fileInput.value = '';
+            selectedFileName.textContent = '';
+            selectedFileName.classList.add('hidden');
+            window.selectedFile = null;
+        });
+    </script>
+</body>
+</html>
