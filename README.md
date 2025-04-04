@@ -1,2 +1,2 @@
 # blurit
-unfocusedyourview
+unfocuseyourview
