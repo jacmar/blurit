@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Selective Focus - Python Edition</title>
+    <link rel="stylesheet" href="https://pyscript.net/latest/pyscript.css" />
+    <script defer src="https://pyscript.net/latest/pyscript.js"></script>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+    <style>
+        :root {
+            --primary-color: #4285f4;
+            --primary-dark: #3367d6;
+            --text-color: #333;
+            --light-grey: #f5f5f5;
+            --border-color: #ddd;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text-color);
+            background-color: var(--light-grey);
+            line-height: 1.6;
+        }
+        
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 500;
+        }
+        
+        main {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .card-title {
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            font-weight: 500;
+        }
+        
+        .upload-container {
+            border: 2px dashed var(--border-color);
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            transition: all 0.3s;
+        }
+        
+        .upload-container:hover {
+            background-color: rgba(66, 133, 244, 0.04);
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.25rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: background-color 0.3s;
+            width: 100%;
+            margin-top: 1rem;
+        }
+        
+        button:hover {
+            background-color: var(--primary-dark);
+        }
+        
+        select, input[type="range"] {
+            width: 100%;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 1rem;
+            background-color: white;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        
+        .parameter-group {
+            margin-bottom: 1rem;
+        }
+        
+        .processing {
+            text-align: center;
+            padding: 2rem;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top: 4px solid var(--primary-color);
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 1rem auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        #imagePreviewGrid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin: 1rem 0;
+        }
+        
+        .preview-item {
+            position: relative;
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+        
+        .preview-item img {
+            width: 100%;
+            display: block;
+        }
+        
+        #results {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 1rem;
+        }
+        
+        .result-item {
+            border-radius: 4px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .result-item img {
+            width: 100%;
+            display: block;
+        }
+        
+        .result-actions {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem;
+        }
+        
+        .result-actions button {
+            margin-top: 0;
+            padding: 0.5rem;
+            font-size: 0.9rem;
+        }
+        
+        /* PyScript specifici */
+        py-terminal {
+            display: none !important;
+        }
+        
+        py-script {
+            display: none;
+        }
+        
+        .py-loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(255, 255, 255, 0.8);
+            z-index: 999;
+        }
+        
+        /* Adattamenti per mobile */
+        @media (max-width: 600px) {
+            .card {
+                padding: 1rem;
+            }
+            #imagePreviewGrid {
+                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            }
+            #results {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>SELECTIVE FOCUS - PYTHON EDITION</h1>
+    </header>
+    
+    <main>
+        <div class="card" id="uploadCard">
+            <h2 class="card-title">Seleziona Immagini</h2>
+            <div class="upload-container" id="dropZone">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#4285f4" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <p>Tocca per selezionare immagini dalla galleria</p>
+            </div>
+            <input type="file" id="fileInput" class="file-input" accept="image/*" multiple>
+            
+            <div id="selectedImagesContainer" class="hidden">
+                <h3 class="card-title">Immagini Selezionate (<span id="imageCount">0</span>)</h3>
+                <div id="imagePreviewGrid"></div>
+                <button id="proceedButton">Procedi con l'Elaborazione</button>
+            </div>
+        </div>
+        
+        <div class="card hidden" id="optionsCard">
+            <h2 class="card-title">Parametri di Elaborazione</h2>
+            
+            <div class="parameter-group">
+                <label for="modeSelect">Modalità di Elaborazione:</label>
+                <select id="modeSelect">
+                    <option value="standard">Standard - Crea una singola immagine con parametri personalizzati</option>
+                    <option value="explore">Esplora - Genera 4 varianti con seed diversi</option>
+                    <option value="sample">Sample - Genera 6 varianti artistiche con lo stesso seed</option>
+                    <option value="refine">Refine - Usa un seed specifico con parametri personalizzati</option>
+                </select>
+            </div>
+            
+            <div class="parameter-group" id="seedGroup">
+                <label for="seedSelect">Seed:</label>
+                <select id="seedSelect">
+                    <option value="random">Genera automaticamente un seed casuale</option>
+                    <option value="custom">Inserisci un seed specifico</option>
+                </select>
+                
+                <div id="customSeedGroup" class="hidden">
+                    <label for="seedInput">Seed (numero intero):</label>
+                    <input type="number" id="seedInput" placeholder="Es. 42" min="1" max="999999">
+                </div>
+            </div>
+            
+            <div id="customParamsGroup">
+                <h3 class="card-title">Parametri Personalizzati</h3>
+                
+                <div class="parameter-group">
+                    <label for="focusRatio">Focus Ratio (0.1-0.9):</label>
+                    <input type="range" id="focusRatio" min="0.1" max="0.9" step="0.05" value="0.3">
+                    <span id="focusRatioValue">0.3</span>
+                </div>
+                
+                <div class="parameter-group">
+                    <label for="blurStrength">Blur Strength (0.1-1.0):</label>
+                    <input type="range" id="blurStrength" min="0.1" max="1.0" step="0.05" value="0.7">
+                    <span id="blurStrengthValue">0.7</span>
+                </div>
+                
+                <div class="parameter-group">
+                    <label for="randomness">Randomness (0.0-1.0):</label>
+                    <input type="range" id="randomness" min="0" max="1.0" step="0.05" value="0.5">
+                    <span id="randomnessValue">0.5</span>
+                </div>
+                
+                <div class="parameter-group">
+                    <label for="ghostThreshold">Ghost Threshold (0.0-1.0):</label>
+                    <input type="range" id="ghostThreshold" min="0" max="1.0" step="0.05" value="0.5">
+                    <span id="ghostThresholdValue">0.5</span>
+                </div>
+            </div>
+            
+            <button id="processButton" py-click="process_images()">Elabora Immagini</button>
+        </div>
+        
+        <div class="card hidden" id="processingCard">
+            <div class="processing">
+                <h2 class="card-title">Elaborazione in corso...</h2>
+                <div class="spinner"></div>
+                <p id="processingStatus">Preparazione delle immagini...</p>
+            </div>
+        </div>
+        
+        <div class="card hidden" id="resultsCard">
+            <h2 class="card-title">Risultati</h2>
+            <div id="results"></div>
+            <button id="saveAllButton">Salva Tutte</button>
+            <button id="newImagesButton">Elabora Nuove Immagini</button>
+        </div>
+    </main>
+    
+    <!-- Python Script -->
+    <py-config>
+    packages = [
+        "numpy",
+        "pillow",
+        "matplotlib",
+        "scipy"
+    ]
+    </py-config>
+    
+    <py-script>
+import numpy as np
+import io
+import random
+import base64
+from PIL import Image, ImageFilter, ImageEnhance
+from js import document, console, Uint8Array, File, FileReader, URL
+import asyncio
+
+# Variabili globali
+selected_images = []
+processed_results = []
+
+# Funzione principale per il processamento delle immagini
+def process_images():
+    mode = document.getElementById("modeSelect").value
+    
+    # Ottieni il seed
+    seed = None
+    if document.getElementById("seedSelect").value == "custom":
+        try:
+            seed = int(document.getElementById("seedInput").value)
+        except:
+            seed = random.randint(1, 999999)
+    else:
+        seed = random.randint(1, 999999)
+    
+    # Parametri personalizzati
+    params = {}
+    if mode in ["standard", "refine"]:
+        params["focus_ratio"] = float(document.getElementById("focusRatio").value)
+        params["blur_strength"] = float(document.getElementById("blurStrength").value)
+        params["randomness"] = float(document.getElementById("randomness").value)
+        params["ghost_threshold"] = float(document.getElementById("ghostThreshold").value)
+    else:
+        # Parametri predefiniti per altre modalità
+        params["focus_ratio"] = 0.3
+        params["blur_strength"] = 0.7
+        params["randomness"] = 0.5
+        params["ghost_threshold"] = 0.5
+    
+    # Nascondi scheda opzioni e mostra scheda elaborazione
+    document.getElementById("optionsCard").classList.add("hidden")
+    document.getElementById("processingCard").classList.remove("hidden")
+    
+    # Converti le immagini selezionate in array NumPy
+    images = [img_to_array(img) for img in selected_images]
+    
+    # Elabora le immagini in base alla modalità
+    results = []
+    
+    if mode == "standard" or mode == "refine":
+        # Elabora una singola immagine con i parametri specificati
+        document.getElementById("processingStatus").innerText = "Elaborazione in corso..."
+        result = selective_focus(images, seed, params)
+        results.append(result)
+    
+    elif mode == "explore":
+        # Genera 4 varianti con seed diversi
+        for i in range(4):
+            current_seed = seed + i if seed else random.randint(1, 999999)
+            document.getElementById("processingStatus").innerText = f"Esplorando variante {i+1}/4..."
+            result = selective_focus(images, current_seed, params)
+            results.append(result)
+    
+    elif mode == "sample":
+        # Genera 6 varianti artistiche con lo stesso seed
+        presets = [
+            {"focus_ratio": 0.2, "blur_strength": 0.5, "randomness": 0.3, "ghost_threshold": 0.4},
+            {"focus_ratio": 0.3, "blur_strength": 0.8, "randomness": 0.6, "ghost_threshold": 0.5},
+            {"focus_ratio": 0.4, "blur_strength": 0.9, "randomness": 0.4, "ghost_threshold": 0.6},
+            {"focus_ratio": 0.5, "blur_strength": 0.7, "randomness": 0.7, "ghost_threshold": 0.3},
+            {"focus_ratio": 0.6, "blur_strength": 0.6, "randomness": 0.5, "ghost_threshold": 0.4},
+            {"focus_ratio": 0.7, "blur_strength": 0.5, "randomness": 0.8, "ghost_threshold": 0.2}
+        ]
+        
+        for i, preset in enumerate(presets):
+            document.getElementById("processingStatus").innerText = f"Creando variante artistica {i+1}/6..."
+            result = selective_focus(images, seed, preset)
+            results.append(result)
+    
+    # Converti i risultati in base64 per la visualizzazione
+    global processed_results
+    processed_results = results
+    
+    # Mostra i risultati
+    display_results(results)
+
+# Funzione principale per l'effetto selective focus
+def selective_focus(images, seed, params):
+    random.seed(seed)
+    np.random.seed(seed)
+    
+    # Assicurati che ci siano immagini
+    if not images or len(images) == 0:
+        return None
+    
+    # Se c'è una sola immagine, applica semplice effetto di sfocatura selettiva
+    if len(images) == 1:
+        return apply_single_image_effect(images[0], params)
+    
+    # Altrimenti, applica lo stacking delle immagini
+    return apply_image_stacking(images, params)
+
+# Effetto per una singola immagine
+def apply_single_image_effect(image_array, params):
+    # Crea immagine PIL dall'array
+    img = array_to_pil(image_array)
+    
+    # Parametri
+    focus_ratio = params["focus_ratio"]  # 0.1-0.9
+    blur_strength = params["blur_strength"]  # 0.1-1.0
+    randomness = params["randomness"]  # 0.0-1.0
+    
+    # Crea una copia sfocata dell'immagine
+    blur_radius = int(20 * blur_strength)
+    blurred = img.filter(ImageFilter.GaussianBlur(radius=blur_radius))
+    
+    # Crea una maschera per il focus selettivo
+    width, height = img.size
+    mask = Image.new('L', (width, height), 0)
+    
+    # Centro dell'immagine
+    center_x, center_y = width // 2, height // 2
+    
+    # Raggio dell'area a fuoco, modificato con focus_ratio
+    focus_size = min(width, height) * (1.0 - focus_ratio * 0.8)
+    
+    # Aggiungi casualità al centro dell'area a fuoco se richiesto
+    if randomness > 0:
+        center_x += int(random.uniform(-width * 0.2, width * 0.2) * randomness)
+        center_y += int(random.uniform(-height * 0.2, height * 0.2) * randomness)
+    
+    # Crea maschera di focus con transizione graduale
+    for y in range(height):
+        for x in range(width):
+            # Distanza dal centro del focus
+            distance = np.sqrt((x - center_x)**2 + (y - center_y)**2)
+            
+            # Valore della maschera (255 = zona chiara/a fuoco, 0 = zona scura/sfocata)
+            if distance < focus_size / 2:
+                mask_value = 255  # Area completamente a fuoco
+            else:
+                # Transizione graduale
+                transition_size = focus_size * 0.5
+                mask_value = max(0, int(255 * (1 - (distance - focus_size/2) / transition_size)))
+            
+            mask.putpixel((x, y), mask_value)
+    
+    # Applica casualità alla maschera se richiesto
+    if randomness > 0:
+        mask_array = np.array(mask)
+        noise = np.random.normal(0, 30 * randomness, mask_array.shape)
+        mask_array = np.clip(mask_array + noise, 0, 255).astype(np.uint8)
+        mask = Image.fromarray(mask_array)
+    
+    # Combina l'immagine originale e quella sfocata usando la maschera
+    result = Image.composite(img, blurred, mask)
+    
+    # Applica effetto "ghost" se threshold > 0
+    if params["ghost_threshold"] > 0:
+        result = apply_ghost_effect(result, mask, params["ghost_threshold"])
+    
+    return pil_to_base64(result)
+
+# Effetto per stacking di multiple immagini
+def apply_image_stacking(images, params):
+    # Resize immagini alla stessa dimensione (usando la prima come riferimento)
+    base_img = array_to_pil(images[0])
+    width, height = base_img.size
+    
+    # Parametri
+    focus_ratio = params["focus_ratio"]
+    blur_strength = params["blur_strength"]
+    randomness = params["randomness"]
+    
+    # Prepara l'immagine risultato
+    result = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+    
+    # Crea maschera base per il focus
+    mask_base = Image.new('L', (width, height), 0)
+    draw = ImageDraw.Draw(mask_base)
+    
+    # Centro dell'immagine (con casualità)
+    center_x = width // 2
+    center_y = height // 2
+    
+    if randomness > 0:
+        center_x += int(random.uniform(-width * 0.2, width * 0.2) * randomness)
+        center_y += int(random.uniform(-height * 0.2, height * 0.2) * randomness)
+    
+    # Raggio dell'area a fuoco
+    focus_size = min(width, height) * (1.0 - focus_ratio * 0.8)
+    
+    # Disegna un cerchio pieno come area di focus
+    draw.ellipse((center_x - focus_size/2, center_y - focus_size/2,
+                   center_x + focus_size/2, center_y + focus_size/2), fill=255)
+    
+    # Sfuma i bordi della maschera
+    mask_base = mask_base.filter(ImageFilter.GaussianBlur(radius=focus_size/10))
+    
+    # Per ogni immagine, applica effetti e combina nel risultato
+    for i, img_array in enumerate(images):
+        img = array_to_pil(img_array)
+        img = img.resize((width, height), Image.LANCZOS)
+        
+        # Crea una copia della maschera base e aggiungi variazione per ogni immagine
+        mask = mask_base.copy()
+        
+        if randomness > 0 and i > 0:
+            # Varia la posizione della maschera per ogni immagine
+            offset_x = int(random.uniform(-width * 0.1, width * 0.1) * randomness)
+            offset_y = int(random.uniform(-height * 0.1, height * 0.1) * randomness)
+            mask = ImageChops.offset(mask, offset_x, offset_y)
+            
+            # Aggiungi un po' di rumore alla maschera
+            mask_array = np.array(mask)
+            noise = np.random.normal(0, 30 * randomness, mask_array.shape)
+            mask_array = np.clip(mask_array + noise, 0, 255).astype(np.uint8)
+            mask = Image.fromarray(mask_array)
+        
+        # Applica sfocatura se non è nella zona di focus
+        blur_radius = int(max(1, 10 * blur_strength * (i + 1) / len(images)))
+        blurred = img.filter(ImageFilter.GaussianBlur(radius=blur_radius))
+        
+        # Combina immagine originale e sfocata usando la maschera
+        processed = Image.composite(img, blurred, mask)
+        
+        # Mescola con il risultato cumulativo
+        if i == 0:
+            result = processed.convert('RGBA')
+        else:
+            # Varia l'opacità per ogni livello
+            alpha = 1.0 - (i / len(images)) * 0.4
+            processed = processed.convert('RGBA')
+            
+            # Crea una maschera per il blending
+            blend_mask = Image.new('L', (width, height), int(255 * alpha))
+            result = Image.composite(processed, result, blend_mask)
+    
+    # Applica effetto ghost se richiesto
+    if params["ghost_threshold"] > 0:
+        result = apply_ghost_effect(result, mask_base, params["ghost_threshold"])
+    
+    return pil_to_base64(result)
+
+# Applica effetto "ghost" (effetto creativo per aree fuori fuoco)
+def apply_ghost_effect(img, mask, threshold):
+    img = img.convert('RGBA')
+    width, height = img.size
+    result = img.copy()
+    pixels = result.load()
+    mask_pixels = mask.load()
+    
+    for y in range(height):
+        for x in range(width):
+            r, g, b, a = pixels[x, y]
+            mask_value = mask_pixels[x, y]
+            
+            # Se siamo fuori dall'area a fuoco in base alla soglia
+            if mask_value < 255 * threshold:
+                # Effetto desaturazione parziale
+                gray = (r + g + b) // 3
+                factor = 0.7  # Intensità dell'effetto
+                
+                # Mix tra colore originale e grigio
+                r = int(r * (1 - factor) + gray * factor)
+                g = int(g * (1 - factor) + gray * factor)
+                b = int(b * (1 - factor) + gray * factor)
+                
+                # Aggiungi leggera tonalità blu/fredda per effetto etereo
+                b = min(255, int(b * 1.1))
+                
+                pixels[x, y] = (r, g, b, a)
+    
+    return result
+
+# Conversione tra formati di immagine
+def img_to_array(img_data):
+    # Decodifica base64 in PIL Image
+    try:
+        img = Image.open(io.BytesIO(base64.b64decode(img_data.split(',')[1])))
+        return np.array(img)
+    except Exception as e:
+        console.error(f"Errore conversione immagine: {str(e)}")
+        return None
+
+def array_to_pil(img_array):
+    return Image.fromarray(img_array)
+
+def pil_to_base64(img, format='JPEG'):
+    buffered = io.BytesIO()
+    if img.mode != 'RGB':
+        img = img.convert('RGB')
+    img.save(buffered, format=format, quality=90)
+    img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
+    return f"data:image/{format.lower()};base64,{img_str}"
+
+# Funzione per mostrare i risultati
+def display_results(results):
+    # Nascondi scheda elaborazione e mostra risultati
+    document.getElementById("processingCard").classList.add("hidden")
+    document.getElementById("resultsCard").classList.remove("hidden")
+    
+    # Ottieni il container dei risultati
+    results_container = document.getElementById("results")
+    results_container.innerHTML = ""
+    
+    # Aggiungi ogni risultato
+    for i, result_data in enumerate(results):
+        if not result_data:
+            continue
+            
+        # Crea elemento risultato
+        result_div = document.createElement("div")
+        result_div.className = "result-item"
+        
+        # Immagine
+        img = document.createElement("img")
+        img.src = result_data
+        img.alt = f"Risultato {i+1}"
+        
+        # Azioni
+        actions_div = document.createElement("div")
+        actions_div.className = "result-actions"
+        
+        # Pulsante salva
+        save_btn = document.createElement("button")
+        save_btn.textContent = "Salva"
+        save_btn.setAttribute("data-index", str(i))
+        save_btn.addEventListener("click", lambda e: save_image(int(e.target.getAttribute("data-index"))))
+        
+        # Aggiungi elementi al DOM
+        actions_div.appendChild(save_btn)
+        result_div.appendChild(img)
+        result_div.appendChild(actions_div)
+        results_container.appendChild(result_div)
+
+# Funzione JavaScript per selezionare immagini
+def select_images():
+    files = document.getElementById("fileInput").files
+    
+    if not files or files.length == 0:
+        return
+    
+    # Resetta le immagini selezionate
+    global selected_images
+    selected_images = []
+    
+    # Aggiorna il contatore
+    document.getElementById("imageCount").innerText = str(files.length)
+    
+    # Mostra il container delle immagini selezionate
+    document.getElementById("selectedImagesContainer").classList.remove("hidden")
+    
+    # Pulisci la griglia di anteprima
+    preview_grid = document.getElementById("imagePreviewGrid")
+    preview_grid.innerHTML = ""
+    
+    # Per ogni file selezionato
+    for i in range(files.length):
+        file = files.item(i)
+        
+        # Crea elemento anteprima
+        preview_item = document.createElement("div")
+        preview_item.className = "preview-item"
+        
+        # Crea elemento immagine
+        img = document.createElement("img")
+        
+                    # Leggi file come data URL
+        reader = FileReader.new()
+        
+        def onload_callback(e, index=i):
+            # Imposta src dell'immagine
+            img.src = e.target.result
+            
+            # Aggiungi l'immagine alla lista delle selezionate
+            selected_images.append(e.target.result)
+            
+            # Aggiungi l'immagine al contenitore delle anteprime
+            preview_item.appendChild(img)
+            preview_grid.appendChild(preview_item)
+        
+        reader.onload = onload_callback
+        reader.readAsDataURL(file)
+
+# Funzione per salvare un'immagine
+def save_image(index):
+    if index >= len(processed_results):
+        return
+        
+    # Ottieni l'URL base64
+    img_data = processed_results[index]
+    
+    # Crea un link per il download
+    a = document.createElement('a')
+    a.href = img_data
+    a.download = f"selective-focus-{index+1}.jpg"
+    
+    # Aggiungi all'elemento, clicca e rimuovi
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+
+# Inizializza gli eventi UI
+def init():
+    # Event listener per il pulsante "Salva tutte"
+    document.getElementById("saveAllButton").addEventListener("click", lambda e: save_all_images())
+    
+    # Event listener per il pulsante "Nuove immagini"
+    document.getElementById("newImagesButton").addEventListener("click", lambda e: reset_app())
+    
+    # Event listener per la selezione immagini
+    document.getElementById("dropZone").addEventListener("click", lambda e: document.getElementById("fileInput").click())
+    document.getElementById("fileInput").addEventListener("change", lambda e: select_images())
+    
+    # Event listener per il pulsante "Procedi"
+    document.getElementById("proceedButton").addEventListener("click", lambda e: show_options())
+    
+    # Aggiorna UI in base alla modalità selezionata
+    document.getElementById("modeSelect").addEventListener("change", lambda e: update_ui())
+    document.getElementById("seedSelect").addEventListener("change", lambda e: update_seed_ui())
+    
+    # Aggiorna valori degli slider
+    setup_sliders()
+
+def save_all_images():
+    for i in range(len(processed_results)):
+        save_image(i)
+
+def reset_app():
+    # Torna alla schermata iniziale
+    document.getElementById("resultsCard").classList.add("hidden")
+    document.getElementById("uploadCard").classList.remove("hidden")
+    
+    # Reset delle immagini selezionate
+    global selected_images
+    selected_images = []
+    
+    # Nascondi il contenitore delle immagini selezionate
+    document.getElementById("selectedImagesContainer").classList.add("hidden")
+    
+    # Pulisci il campo file
+    document.getElementById("fileInput").value = ""
+    
+    # Pulisci la griglia di anteprima
+    document.getElementById("imagePreviewGrid").innerHTML = ""
+
+def show_options():
+    # Nascondi scheda upload e mostra opzioni
+    document.getElementById("uploadCard").classList.add("hidden")
+    document.getElementById("optionsCard").classList.remove("hidden")
+    
+    # Aggiorna l'interfaccia
+    update_ui()
+
+def update_ui():
+    mode = document.getElementById("modeSelect").value
+    
+    # Mostra/nascondi gruppo seed in base alla modalità
+    if mode in ["refine", "sample"]:
+        document.getElementById("seedGroup").classList.remove("hidden")
+    else:
+        document.getElementById("seedGroup").classList.add("hidden")
+    
+    # Mostra/nascondi gruppo parametri personalizzati in base alla modalità
+    if mode in ["standard", "refine"]:
+        document.getElementById("customParamsGroup").classList.remove("hidden")
+    else:
+        document.getElementById("customParamsGroup").classList.add("hidden")
+    
+    # Aggiorna UI del seed
+    update_seed_ui()
+
+def update_seed_ui():
+    seed_select = document.getElementById("seedSelect").value
+    
+    # Mostra/nascondi input del seed personalizzato
+    if seed_select == "custom":
+        document.getElementById("customSeedGroup").classList.remove("hidden")
+    else:
+        document.getElementById("customSeedGroup").classList.add("hidden")
+
+def setup_sliders():
+    # Focus Ratio
+    document.getElementById("focusRatio").addEventListener("input", lambda e: 
+        document.getElementById("focusRatioValue").innerText = e.target.value)
+    
+    # Blur Strength
+    document.getElementById("blurStrength").addEventListener("input", lambda e: 
+        document.getElementById("blurStrengthValue").innerText = e.target.value)
+    
+    # Randomness
+    document.getElementById("randomness").addEventListener("input", lambda e: 
+        document.getElementById("randomnessValue").innerText = e.target.value)
+    
+    # Ghost Threshold
+    document.getElementById("ghostThreshold").addEventListener("input", lambda e: 
+        document.getElementById("ghostThresholdValue").innerText = e.target.value)
+
+# Inizializza quando il documento è pronto
+init()
