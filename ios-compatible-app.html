@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Selective Focus</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+    <style>
+        :root {
+            --primary-color: #4285f4;
+            --primary-dark: #3367d6;
+            --text-color: #333;
+            --light-grey: #f5f5f5;
+            --border-color: #ddd;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text-color);
+            background-color: var(--light-grey);
+            line-height: 1.6;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding-top: env(safe-area-inset-top);
+        }
+        
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 500;
+        }
+        
+        main {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .card-title {
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            font-weight: 500;
+        }
+        
+        .upload-container {
+            border: 2px dashed var(--border-color);
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            transition: all 0.3s;
+        }
+        
+        .upload-container:hover, .upload-container:active {
+            background-color: rgba(66, 133, 244, 0.05);
+        }
+        
+        .upload-container p {
+            color: #666;
+            margin-top: 0.5rem;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        #fileInput {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0,0,0,0);
+            border: 0;
+        }
+        
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: background-color 0.3s;
+            -webkit-appearance: none;
+            width: 100%;
+            margin-top: 1rem;
+        }
+        
+        button:hover, button:active {
+            background-color: var(--primary-dark);
+        }
+        
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        select, input[type="range"] {
+            width: 100%;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            background-color: white;
+            -webkit-appearance: none;
+        }
+
+        /* Stile per gli slider */
+        input[type="range"] {
+            -webkit-appearance: none;
+            height: 8px;
+            background: #d3d3d3;
+            border-radius: 4px;
+            outline: none;
+            padding: 0;
+            margin: 10px 0;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        
+        .parameter-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .processing {
+            text-align: center;
+            padding: 1rem;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top: 4px solid var(--primary-color);
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 1rem auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Image preview */
+        .image-preview {
+            width: 100%;
+            margin: 1rem 0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .image-preview img {
+            width: 100%;
+            display: block;
+        }
+        
+        /* Canvas container */
+        .canvas-container {
+            width: 100%;
+            margin: 1rem 0;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        canvas {
+            width: 100%;
+            display: block;
+        }
+        
+        .slider-container {
+            display: flex;
+            align-items: center;
+        }
+        
+        .slider-value {
+            margin-left: 10px;
+            min-width: 36px;
+            text-align: right;
+        }
+        
+        .btn-secondary {
+            background-color: #757575;
+            margin-top: 0.5rem;
+        }
+        
+        .btn-secondary:hover, .btn-secondary:active {
+            background-color: #616161;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>SELECTIVE FOCUS</h1>
+    </header>
+    
+    <main>
+        <div class="card" id="uploadCard">
+            <h2 class="card-title">Seleziona un'immagine</h2>
+            <label for="fileInput" class="upload-container" id="uploadLabel">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#4285f4" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <p>Tocca per selezionare un'immagine dalla galleria</p>
+            </label>
+            <input type="file" id="fileInput" accept="image/*">
+            
+            <div id="previewContainer" class="hidden">
+                <div class="image-preview">
+                    <img id="imagePreview" src="#" alt="Anteprima">
+                </div>
+                <button id="continueButton">Continua</button>
+                <button id="selectDifferentImage" class="btn-secondary">Seleziona un'altra immagine</button>
+            </div>
+        </div>
+        
+        <div class="card hidden" id="optionsCard">
+            <h2 class="card-title">Effetto Selective Focus</h2>
+            
+            <div class="parameter-group">
+                <label for="effectSelect">Tipo di effetto:</label>
+                <select id="effectSelect">
+                    <option value="center">Focus Centrale</option>
+                    <option value="radial">Sfocatura Radiale</option>
+                    <option value="horizontal">Focus Orizzontale</option>
+                    <option value="vertical">Focus Verticale</option>
+                </select>
+            </div>
+            
+            <div class="parameter-group">
+                <label for="blurIntensity">Intensità sfocatura:</label>
+                <div class="slider-container">
+                    <input type="range" id="blurIntensity" min="1" max="20" value="10" step="1">
+                    <span id="blurValue" class="slider-value">10</span>
+                </div>
+            </div>
+            
+            <div class="parameter-group">
+                <label for="focusSize">Dimensione area a fuoco:</label>
+                <div class="slider-container">
+                    <input type="range" id="focusSize" min="10" max="80" value="40" step="5">
+                    <span id="focusValue" class="slider-value">40%</span>
+                </div>
+            </div>
+            
+            <button id="applyEffectButton">Applica Effetto</button>
+            <button id="backToImageButton" class="btn-secondary">Cambia Immagine</button>
+        </div>
+        
+        <div class="card hidden" id="processingCard">
+            <div class="processing">
+                <h2 class="card-title">Elaborazione in corso...</h2>
+                <div class="spinner"></div>
+                <p>Applicazione dell'effetto di messa a fuoco selettiva</p>
+            </div>
+        </div>
+        
+        <div class="card hidden" id="resultCard">
+            <h2 class="card-title">Risultato</h2>
+            
+            <div class="canvas-container">
+                <canvas id="resultCanvas"></canvas>
+            </div>
+            
+            <button id="saveButton">Salva nella Galleria</button>
+            <button id="editAgainButton">Modifica Ancora</button>
+            <button id="newImageButton" class="btn-secondary">Nuova Immagine</button>
+        </div>
+    </main>
+    
+    <script>
+        // Elementi DOM
+        const fileInput = document.getElementById('fileInput');
+        const imagePreview = document.getElementById('imagePreview');
+        const previewContainer = document.getElementById('previewContainer');
+        const continueButton = document.getElementById('continueButton');
+        const selectDifferentImage = document.getElementById('selectDifferentImage');
+        
+        const uploadCard = document.getElementById('uploadCard');
+        const optionsCard = document.getElementById('optionsCard');
+        const processingCard = document.getElementById('processingCard');
+        const resultCard = document.getElementById('resultCard');
+        
+        const effectSelect = document.getElementById('effectSelect');
+        const blurIntensity = document.getElementById('blurIntensity');
+        const blurValue = document.getElementById('blurValue');
+        const focusSize = document.getElementById('focusSize');
+        const focusValue = document.getElementById('focusValue');
+        
+        const applyEffectButton = document.getElementById('applyEffectButton');
+        const backToImageButton = document.getElementById('backToImageButton');
+        const resultCanvas = document.getElementById('resultCanvas');
+        const saveButton = document.getElementById('saveButton');
+        const editAgainButton = document.getElementById('editAgainButton');
+        const newImageButton = document.getElementById('newImageButton');
+        
+        // Variabili globali
+        let originalImage = null;
+        
+        // Inizializza gli slider
+        blurIntensity.addEventListener('input', function() {
+            blurValue.textContent = this.value;
+        });
+        
+        focusSize.addEventListener('input', function() {
+            focusValue.textContent = this.value + '%';
+        });
+        
+        // Gestione selezione immagine
+        fileInput.addEventListener('change', function(e) {
+            if (!e.target.files || !e.target.files[0]) return;
+            
+            const file = e.target.files[0];
+            
+            // Verifica che sia un'immagine
+            if (!file.type.match('image.*')) {
+                alert('Per favore seleziona un file immagine.');
+                return;
+            }
+            
+            // Leggi e mostra l'anteprima
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                imagePreview.src = event.target.result;
+                previewContainer.classList.remove('hidden');
+                
+                // Carica l'immagine per l'elaborazione
+                originalImage = new Image();
+                originalImage.onload = function() {
+                    console.log(`Immagine caricata: ${originalImage.width}x${originalImage.height}`);
+                };
+                originalImage.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+        
+        // Continua con l'applicazione dell'effetto
+        continueButton.addEventListener('click', function() {
+            if (!originalImage) {
+                alert('Seleziona prima un\'immagine');
+                return;
+            }
+            
+            uploadCard.classList.add('hidden');
+            optionsCard.classList.remove('hidden');
+        });
+        
+        // Torna indietro per selezionare un'altra immagine
+        selectDifferentImage.addEventListener('click', function() {
+            previewContainer.classList.add('hidden');
+            fileInput.value = '';
+            originalImage = null;
+        });
+        
+        // Torna alla selezione immagine
+        backToImageButton.addEventListener('click', function() {
+            optionsCard.classList.add('hidden');
+            uploadCard.classList.remove('hidden');
+        });
+        
+        // Applica l'effetto di selective focus
+        applyEffectButton.addEventListener('click', function() {
+            if (!originalImage) {
+                alert('Immagine non disponibile');
+                return;
+            }
+            
+            // Mostra la schermata di elaborazione
+            optionsCard.classList.add('hidden');
+            processingCard.classList.remove('hidden');
+            
+            // Piccolo timeout per permettere al browser di aggiornare l'UI
+            setTimeout(function() {
+                // Parametri
+                const effect = effectSelect.value;
+                const blur = parseInt(blurIntensity.value);
+                const focus = parseInt(focusSize.value) / 100;
+                
+                // Applica l'effetto
+                applySelectiveFocus(originalImage, effect, blur, focus);
+                
+                // Mostra il risultato
+                processingCard.classList.add('hidden');
+                resultCard.classList.remove('hidden');
+            }, 500);
+        });
+        
+        // Funzione per applicare l'effetto di selective focus
+        function applySelectiveFocus(image, effect, blurRadius, focusSize) {
+            // Crea canvas
+            const canvas = resultCanvas;
+            const ctx = canvas.getContext('2d');
+            
+            // Imposta dimensioni canvas (limita a max 1200px per lato per performance)
+            const maxDimension = 1200;
+            let width = image.width;
+            let height = image.height;
+            
+            if (width > maxDimension || height > maxDimension) {
+                if (width > height) {
+                    height = Math.round(height * (maxDimension / width));
+                    width = maxDimension;
+                } else {
+                    width = Math.round(width * (maxDimension / height));
+                    height = maxDimension;
+                }
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            // Disegna l'immagine originale
+            ctx.drawImage(image, 0, 0, width, height);
+            
+            // Crea una copia con blur
+            const blurredCanvas = document.createElement('canvas');
+            blurredCanvas.width = width;
+            blurredCanvas.height = height;
+            const blurCtx = blurredCanvas.getContext('2d');
+            blurCtx.drawImage(image, 0, 0, width, height);
+            
+            // Applica blur all'intera immagine copiata
+            stackBlur(blurCtx, 0, 0, width, height, blurRadius);
+            
+            // Crea maschera in base all'effetto selezionato
+            createFocusMask(ctx, blurCtx, width, height, effect, focusSize);
+        }
+        
+        // Crea maschera di focus
+        function createFocusMask(ctx, blurCtx, width, height, effect, focusSize) {
+            // Ottieni dati immagine
+            const originalData = ctx.getImageData(0, 0, width, height);
+            const blurredData = blurCtx.getImageData(0, 0, width, height);
+            const resultData = ctx.createImageData(width, height);
+            
+            // Parametri per l'area di focus
+            const centerX = width / 2;
+            const centerY = height / 2;
+            
+            // Calcola il raggio di focus (basato sulla dimensione minore)
+            const minDimension = Math.min(width, height);
+            const focusRadius = minDimension * focusSize / 2;
+            
+            // Dimensione transizione (border morbido)
+            const transitionSize = focusRadius * 0.5;
+            
+            // Diametro dell'immagine (per calcolare distanza massima)
+            const maxDistance = Math.sqrt(width * width + height * height) / 2;
+            
+            // Applica la maschera in base all'effetto selezionato
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const i = (y * width + x) * 4;
+                    
+                    // Calcola fattore di blend (0 = originale, 1 = sfocato)
+                    let blendFactor = 0;
+                    
+                    if (effect === 'center') {
+                        // Distanza dal centro
+                        const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+                        
+                        if (distance < focusRadius) {
+                            blendFactor = 0; // Area a fuoco
+                        } else {
+                            // Transizione graduale
+                            blendFactor = Math.min(1, (distance - focusRadius) / transitionSize);
+                        }
+                    } 
+                    else if (effect === 'radial') {
+                        // Distanza normalizzata dal centro (0 al centro, 1 ai bordi)
+                        const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2)) / maxDistance;
+                        blendFactor = distance * 1.5; // Moltiplicatore per aumentare l'effetto
+                        blendFactor = Math.min(1, blendFactor);
+                    }
+                    else if (effect === 'horizontal') {
+                        // Distanza dalla linea orizzontale centrale
+                        const distance = Math.abs(y - centerY);
+                        
+                        if (distance < focusRadius) {
+                            blendFactor = 0; // Area a fuoco
+                        } else {
+                            // Transizione graduale
+                            blendFactor = Math.min(1, (distance - focusRadius) / transitionSize);
+                        }
+                    }
+                    else if (effect === 'vertical') {
+                        // Distanza dalla linea verticale centrale
+                        const distance = Math.abs(x - centerX);
+                        
+                        if (distance < focusRadius) {
+                            blendFactor = 0; // Area a fuoco
+                        } else {
+                            // Transizione graduale
+                            blendFactor = Math.min(1, (distance - focusRadius) / transitionSize);
+                        }
+                    }
+                    
+                    // Mescola pixel originali e sfocati
+                    resultData.data[i] = originalData.data[i] * (1 - blendFactor) + blurredData.data[i] * blendFactor;
+                    resultData.data[i+1] = originalData.data[i+1] * (1 - blendFactor) + blurredData.data[i+1] * blendFactor;
+                    resultData.data[i+2] = originalData.data[i+2] * (1 - blendFactor) + blurredData.data[i+2] * blendFactor;
+                    resultData.data[i+3] = 255; // Alpha sempre a 255
+                }
+            }
+            
+            // Applica il risultato
+            ctx.putImageData(resultData, 0, 0);
+        }
+        
+        // Stack Blur - versione semplificata per performance mobile
+        function stackBlur(ctx, x, y, width, height, radius) {
+            if (radius < 1) return;
+            
+            const imageData = ctx.getImageData(x, y, width, height);
+            const pixels = imageData.data;
+            
+            // Blur orizzontale
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    let r = 0, g = 0, b = 0;
+                    let count = 0;
+                    
+                    // Prendi la media dei pixel circostanti
+                    for (let i = -radius; i <= radius; i++) {
+                        const px = x + i;
+                        if (px < 0 || px >= width) continue;
+                        
+                        const idx = (y * width + px) * 4;
+                        r += pixels[idx];
+                        g += pixels[idx + 1];
+                        b += pixels[idx + 2];
+                        count++;
+                    }
+                    
+                    // Imposta il valore medio
+                    const idx = (y * width + x) * 4;
+                    pixels[idx] = r / count;
+                    pixels[idx + 1] = g / count;
+                    pixels[idx + 2] = b / count;
+                }
+            }
+            
+            // Blur verticale
+            for (let x = 0; x < width; x++) {
+                for (let y = 0; y < height; y++) {
+                    let r = 0, g = 0, b = 0;
+                    let count = 0;
+                    
+                    // Prendi la media dei pixel circostanti
+                    for (let i = -radius; i <= radius; i++) {
+                        const py = y + i;
+                        if (py < 0 || py >= height) continue;
+                        
+                        const idx = (py * width + x) * 4;
+                        r += pixels[idx];
+                        g += pixels[idx + 1];
+                        b += pixels[idx + 2];
+                        count++;
+                    }
+                    
+                    // Imposta il valore medio
+                    const idx = (y * width + x) * 4;
+                    pixels[idx] = r / count;
+                    pixels[idx + 1] = g / count;
+                    pixels[idx + 2] = b / count;
+                }
+            }
+            
+            ctx.putImageData(imageData, x, y);
+        }
+        
+        // Salva l'immagine
+        saveButton.addEventListener('click', function() {
+            if (!resultCanvas) return;
+            
+            const dataUrl = resultCanvas.toDataURL('image/jpeg', 0.9);
+            
+            // Per dispositivi iOS, mostra un'indicazione per il salvataggio
+            if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                // Crea un link temporaneo per il download
+                const tempLink = document.createElement('a');
+                tempLink.href = dataUrl;
+                tempLink.download = 'selective-focus-image.jpg';
+                document.body.appendChild(tempLink);
+                
+                // Mostra istruzioni per iOS
+                alert('Per salvare l\'immagine:\n1. Tocca e tieni premuto sull\'immagine\n2. Seleziona "Salva immagine"');
+                
+                // Apri l'immagine in una nuova scheda (da lì l'utente può salvarla)
+                window.open(dataUrl);
+                
+                // Rimuovi il link
+                document.body.removeChild(tempLink);
+            } else {
+                // Per altri dispositivi, usa il download diretto
+                const link = document.createElement('a');
+                link.href = dataUrl;
+                link.download = 'selective-focus-image.jpg';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        });
+        
+        // Modifica ancora con gli stessi parametri
+        editAgainButton.addEventListener('click', function() {
+            resultCard.classList.add('hidden');
+            optionsCard.classList.remove('hidden');
+        });
+        
+        // Torna alla selezione immagine
+        newImageButton.addEventListener('click', function() {
+            resultCard.classList.add('hidden');
+            uploadCard.classList.remove('hidden');
+            previewContainer.classList.add('hidden');
+            fileInput.value = '';
+            originalImage = null;
+        });
+        
+        // Registra service worker per PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(function(registration) {
+                        console.log('Service Worker registrato');
+                    })
+                    .catch(function(error) {
+                        console.log('Errore registrazione Service Worker: ', error);
+                    });
+            });
+        }
+    </script>
+</body>
+</html>
