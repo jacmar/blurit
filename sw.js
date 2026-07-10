@@ -1,4 +1,4 @@
-const CACHE_NAME = 'blurit-v2';
+const CACHE_NAME = 'blurit-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -30,22 +30,35 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Cache-first per l'app shell, con fallback in rete e aggiornamento del cache.
+// Codice (html/js/json): network-first, così gli aggiornamenti arrivano
+// subito e il cache serve solo da fallback offline.
+// Asset statici (icone): cache-first.
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
-  event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) return cached;
-      return fetch(event.request).then(response => {
+  const isCode = event.request.mode === 'navigate' || /\.(html|js|json)$/.test(url.pathname) || url.pathname.endsWith('/');
+
+  if (isCode) {
+    event.respondWith(
+      fetch(event.request).then(response => {
         if (response.ok) {
           const copy = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
         }
         return response;
-      });
-    })
-  );
+      }).catch(() => caches.match(event.request))
+    );
+  } else {
+    event.respondWith(
+      caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+        }
+        return response;
+      }))
+    );
+  }
 });

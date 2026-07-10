@@ -186,11 +186,12 @@
                     <rect x="3" y="3" width="13" height="13" rx="2"></rect>
                     <rect x="8" y="8" width="13" height="13" rx="2"></rect>
                 </svg>
-                <p><strong>Scegli una sequenza di foto</strong> (2–10 scatti simili, es. raffica)</p>
+                <p><strong id="dropLabel">Scegli una sequenza di foto (2–10 scatti simili, es. raffica)</strong></p>
                 <p class="hint">Funziona anche con una foto singola. Tutto resta sul tuo dispositivo.</p>
             </div>
             <input type="file" id="fileInput" class="hidden" accept="image/*" multiple>
             <div id="thumbs"></div>
+            <p class="hint" id="loadInfo" style="margin-top:0.5rem"></p>
         </section>
 
         <!-- 2. composizione -->

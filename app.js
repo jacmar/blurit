@@ -37,13 +37,16 @@ const PARAM_IDS = ['focusSize', 'focusEdge', 'softness', 'chaos', 'ghost', 'desa
 // ---------- stato ----------
 
 const state = {
-    files: [],
-    bitmaps: [],            // ImageBitmap alla risoluzione originale
+    files: [],              // solo i File decodificati con successo
     preview: null,          // { frames: ImageData[], width, height }
     focusX: 0.5,
     focusY: 0.5,
     mode: 'selettiva',
 };
+// Le foto NON vengono tenute in memoria a piena risoluzione: si decodificano
+// una alla volta, si riducono subito alla risoluzione di lavoro e si libera
+// tutto. Per l'export HD si ridecodificano al momento. Fondamentale su
+// iPhone, dove 10 scatti decodificati insieme saturano la memoria di Safari.
 
 // ---------- elementi ----------
 
@@ -51,6 +54,7 @@ const $ = id => document.getElementById(id);
 const fileInput = $('fileInput');
 const dropZone = $('dropZone');
 const thumbs = $('thumbs');
+const loadInfo = $('loadInfo');
 const composeCard = $('composeCard');
 const resultsCard = $('resultsCard');
 const previewCanvas = $('previewCanvas');
@@ -168,67 +172,150 @@ fileInput.addEventListener('change', e => {
     if (e.target.files.length) loadFiles(e.target.files);
 });
 
-async function loadFiles(fileList) {
-    const files = Array.from(fileList).filter(f => f.type.startsWith('image/')).slice(0, MAX_FRAMES);
-    if (!files.length) return;
-    state.files = files;
-
-    thumbs.innerHTML = '';
-    for (const bmp of state.bitmaps) bmp.close();
-
-    try {
-        state.bitmaps = await Promise.all(files.map(f => createImageBitmap(f)));
-    } catch (err) {
-        alert('Impossibile leggere una delle immagini: ' + err.message);
-        return;
+// Decodifica una singola immagine. Prova createImageBitmap (veloce),
+// con fallback su <img> + decode() per i formati che Safari non passa
+// a ImageBitmap (es. HEIC).
+async function decodeImage(file) {
+    if (typeof createImageBitmap === 'function') {
+        try {
+            const bmp = await createImageBitmap(file);
+            return { el: bmp, w: bmp.width, h: bmp.height, free: () => bmp.close() };
+        } catch (err) { /* fallback sotto */ }
     }
-
-    files.forEach((file, i) => {
-        const div = document.createElement('div');
-        div.className = 'thumb';
-        const img = document.createElement('img');
-        img.src = URL.createObjectURL(file);
-        img.onload = () => URL.revokeObjectURL(img.src);
-        img.alt = file.name;
-        const n = document.createElement('span');
-        n.className = 'n';
-        n.textContent = i + 1;
-        div.append(img, n);
-        thumbs.appendChild(div);
-    });
-
-    state.preview = rasterize(state.bitmaps, PREVIEW_MAX);
-    state.focusX = 0.5;
-    state.focusY = 0.5;
-
-    composeCard.classList.remove('hidden');
-    selectMode(state.mode in MODES ? state.mode : 'selettiva');
-    if (!seedInput.value) seedInput.value = newSeed();
-    drawPreview();
-    composeCard.scrollIntoView({ behavior: 'smooth' });
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = url;
+    try {
+        if (img.decode) {
+            await img.decode();
+        } else {
+            await new Promise((res, rej) => {
+                img.onload = res;
+                img.onerror = () => rej(new Error('formato non leggibile'));
+            });
+        }
+    } catch (err) {
+        URL.revokeObjectURL(url);
+        throw err;
+    }
+    return { el: img, w: img.naturalWidth, h: img.naturalHeight, free: () => URL.revokeObjectURL(url) };
 }
 
-// Rasterizza tutti i frame alla stessa dimensione (dal primo frame),
-// con riempimento tipo "cover" per tollerare piccole differenze di formato.
-function rasterize(bitmaps, maxSide) {
-    const first = bitmaps[0];
-    let W = first.width, H = first.height;
-    if (Math.max(W, H) > maxSide) {
-        const k = maxSide / Math.max(W, H);
-        W = Math.round(W * k);
-        H = Math.round(H * k);
+// Costruisce i frame alla stessa dimensione (presa dal primo leggibile),
+// UNO ALLA VOLTA: memoria minima e progresso visibile. Riempimento "cover"
+// per tollerare piccole differenze di formato. I file illeggibili vengono
+// saltati, non fanno fallire la sequenza.
+async function buildFrames(files, maxSide, onProgress, onFrame) {
+    let W = 0, H = 0, canvas, ctx;
+    const frames = [];
+    const okFiles = [];
+    let failed = 0;
+    for (let i = 0; i < files.length; i++) {
+        onProgress && onProgress(i, files.length);
+        let src;
+        try {
+            src = await decodeImage(files[i]);
+        } catch (err) {
+            failed++;
+            continue;
+        }
+        try {
+            if (!W) {
+                W = src.w; H = src.h;
+                if (Math.max(W, H) > maxSide) {
+                    const k = maxSide / Math.max(W, H);
+                    W = Math.round(W * k);
+                    H = Math.round(H * k);
+                }
+                canvas = document.createElement('canvas');
+                canvas.width = W; canvas.height = H;
+                ctx = canvas.getContext('2d', { willReadFrequently: true });
+            }
+            const k = Math.max(W / src.w, H / src.h);
+            const dw = src.w * k, dh = src.h * k;
+            ctx.clearRect(0, 0, W, H);
+            ctx.drawImage(src.el, (W - dw) / 2, (H - dh) / 2, dw, dh);
+            frames.push(ctx.getImageData(0, 0, W, H));
+            okFiles.push(files[i]);
+            onFrame && onFrame(okFiles.length - 1, canvas);
+        } finally {
+            src.free();
+        }
+        // lascia respirare l'interfaccia tra un frame e l'altro
+        await new Promise(r => setTimeout(r, 0));
     }
-    const canvas = document.createElement('canvas');
-    canvas.width = W; canvas.height = H;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    const frames = bitmaps.map(bmp => {
-        const k = Math.max(W / bmp.width, H / bmp.height);
-        const dw = bmp.width * k, dh = bmp.height * k;
-        ctx.clearRect(0, 0, W, H);
-        ctx.drawImage(bmp, (W - dw) / 2, (H - dh) / 2, dw, dh);
-        return ctx.getImageData(0, 0, W, H);
-    });
-    return { frames, width: W, height: H };
+    onProgress && onProgress(files.length, files.length);
+    return { frames, width: W, height: H, okFiles, failed };
+}
+
+function addThumb(index, canvas) {
+    const div = document.createElement('div');
+    div.className = 'thumb';
+    const img = document.createElement('img');
+    // miniatura leggera generata dal frame già ridotto (niente foto full-res nel DOM)
+    const t = document.createElement('canvas');
+    const k = 160 / Math.max(canvas.width, canvas.height);
+    t.width = Math.max(1, Math.round(canvas.width * k));
+    t.height = Math.max(1, Math.round(canvas.height * k));
+    t.getContext('2d').drawImage(canvas, 0, 0, t.width, t.height);
+    t.toBlob(blob => { if (blob) img.src = URL.createObjectURL(blob); }, 'image/jpeg', 0.8);
+    img.onload = () => URL.revokeObjectURL(img.src);
+    const n = document.createElement('span');
+    n.className = 'n';
+    n.textContent = index + 1;
+    div.append(img, n);
+    thumbs.appendChild(div);
+}
+
+let loading = false;
+
+async function loadFiles(fileList) {
+    if (loading) return;
+    // iOS a volte non valorizza file.type: non scartare i file senza tipo,
+    // sarà la decodifica a dire se sono immagini valide
+    const all = Array.from(fileList).filter(f => !f.type || f.type.startsWith('image/'));
+    const files = all.slice(0, MAX_FRAMES);
+    if (!files.length) return;
+
+    loading = true;
+    thumbs.innerHTML = '';
+    loadInfo.textContent = '';
+    state.preview = null;
+    previewBg = null;
+    composeCard.classList.add('hidden');
+
+    const dropLabel = $('dropLabel');
+    const originalLabel = dropLabel.textContent;
+    try {
+        const built = await buildFrames(
+            files, PREVIEW_MAX,
+            (done, total) => { dropLabel.textContent = `Preparazione foto ${Math.min(done + 1, total)}/${total}…`; },
+            addThumb
+        );
+        if (!built.frames.length) {
+            loadInfo.textContent = 'Nessuna delle immagini selezionate è leggibile.';
+            return;
+        }
+        state.files = built.okFiles;
+        state.preview = { frames: built.frames, width: built.width, height: built.height };
+        state.focusX = 0.5;
+        state.focusY = 0.5;
+
+        const parts = [`${built.frames.length} foto pronte`];
+        if (built.failed) parts.push(`${built.failed} non leggibili`);
+        if (all.length > MAX_FRAMES) parts.push(`limite ${MAX_FRAMES}, le altre sono state ignorate`);
+        loadInfo.textContent = parts.join(' · ');
+
+        composeCard.classList.remove('hidden');
+        selectMode(state.mode in MODES ? state.mode : 'selettiva');
+        if (!seedInput.value) seedInput.value = newSeed();
+        drawPreview();
+        composeCard.scrollIntoView({ behavior: 'smooth' });
+    } finally {
+        dropLabel.textContent = originalLabel;
+        loading = false;
+    }
 }
 
 // ---------- anteprima con punto di fuoco ----------
@@ -346,9 +433,8 @@ $('resetButton').addEventListener('click', () => {
     resultsCard.classList.add('hidden');
     results.innerHTML = '';
     thumbs.innerHTML = '';
-    for (const bmp of state.bitmaps) bmp.close();
+    loadInfo.textContent = '';
     state.files = [];
-    state.bitmaps = [];
     state.preview = null;
     previewBg = null;
     fileInput.value = '';
@@ -420,12 +506,22 @@ function addResult(imageData, params) {
 }
 
 async function exportHD(params, button) {
-    if (!state.bitmaps.length) return;
+    if (!state.files.length) return;
     const original = button.textContent;
     button.disabled = true;
     setBusy(true);
     try {
-        const full = rasterize(state.bitmaps, EXPORT_MAX);
+        // cap adattivo: con molti frame la risoluzione scende per non
+        // saturare la memoria (soprattutto su mobile)
+        const n = state.files.length;
+        const cap = n <= 4 ? EXPORT_MAX : n <= 6 ? 3072 : 2560;
+        progressLabel.textContent = 'Export HD · rilettura delle foto…';
+        progressBar.style.width = '0%';
+        const full = await buildFrames(
+            state.files, cap,
+            (done, total) => { progressLabel.textContent = `Export HD · rilettura foto ${Math.min(done + 1, total)}/${total}…`; }
+        );
+        if (!full.frames.length) throw new Error('impossibile rileggere le foto');
         const imageData = await runJob(
             full.frames, full.width, full.height, params,
             (stage, frac) => showProgress('Export HD · ', stage, frac)
