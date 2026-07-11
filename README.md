@@ -53,19 +53,39 @@ tutto a mano. «Genera 4 varianti» esplora seed diversi; «Riusa seed» riporta
 nei controlli i parametri esatti di un risultato; «HD» rielabora alla
 risoluzione originale (fino a 4096px di lato) con lo stesso seed.
 
+## CLI e skill per Claude Code
+
+Lo stesso motore gira anche da riga di comando (utile per batch e per
+l'integrazione con Claude Code — il repo include la skill `/blurit` in
+`.claude/skills/`):
+
+```bash
+npm install   # solo per il CLI: la web app resta senza dipendenze
+node cli.js --mode fantasmatica --seed 4242 raffica/*.jpg
+node cli.js --mode pittorica --variants 4 --focus 0.35,0.6 --set chaos=0.8 a.jpg b.jpg c.jpg
+```
+
+Con la skill, una sessione Claude Code aperta su questo progetto capisce
+richieste come «ricomponi queste foto, più fantasmatico, fuoco in alto a
+sinistra» e le traduce in chiamate al CLI, riportando i seed per rigenerare
+o raffinare ogni risultato.
+
 ## Struttura
 
 ```
 index.html    interfaccia (markup + stile)
-app.js        logica UI: sequenza, punto di fuoco, preset, dialogo col worker
-engine.js     motore di ricomposizione (Web Worker)
+app.js        logica UI: sequenza, punto di fuoco, dialogo col worker
+presets.js    preset delle modalità (condivisi tra web app e CLI)
+engine.js     motore di ricomposizione (Web Worker nel browser, modulo in Node)
+cli.js        interfaccia a riga di comando (usa sharp per I/O immagini)
 sw.js         service worker (PWA offline)
 manifest.json manifest PWA
 icons/        icone
+.claude/      skill /blurit per Claude Code
 ```
 
-Nessuna dipendenza esterna: basta un hosting statico (funziona anche su
-GitHub Pages, i percorsi sono relativi).
+La web app non ha dipendenze: basta un hosting statico (funziona anche su
+GitHub Pages, i percorsi sono relativi). `npm install` serve solo al CLI.
 
 ## Roadmap
 
@@ -74,5 +94,6 @@ GitHub Pages, i percorsi sono relativi).
 - [ ] Maschera di fuoco disegnabile a mano (pennello) oltre a quella radiale
 - [ ] Import diretto di video brevi / Live Photo con estrazione frame
 - [ ] Cronologia dei seed preferiti
+- [x] Skill `/blurit` per Claude Code (CLI sullo stesso motore)
 - [ ] **Fase 2 — integrazione**: valutare un plugin o un passaggio di export
       verso Affinity / Canva, una volta consolidato il prototipo standalone

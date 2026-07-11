@@ -1,8 +1,9 @@
-const CACHE_NAME = 'blurit-v3';
+const CACHE_NAME = 'blurit-v4';
 const ASSETS = [
   './',
   './index.html',
   './app.js',
+  './presets.js',
   './engine.js',
   './manifest.json',
   './icons/icon-128x128.png',
