@@ -277,8 +277,15 @@ function renderComposite(frames, W, H, params, report) {
   return out;
 }
 
-// ---------- protocollo worker ----------
+// ---------- export per Node (CLI / skill) ----------
 
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { renderComposite, mulberry32, makeNoise };
+}
+
+// ---------- protocollo worker (browser) ----------
+
+if (typeof self !== 'undefined' && typeof self.postMessage === 'function')
 self.onmessage = function (e) {
   const msg = e.data;
   if (msg.type !== 'process') return;

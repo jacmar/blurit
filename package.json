@@ -1,0 +1,10 @@
+{
+  "name": "blurit",
+  "version": "1.0.0",
+  "description": "Ricomposizione fotografica selettiva, semi-casuale, governabile. La web app non ha dipendenze; npm serve solo per il CLI (cli.js) usato dalla skill.",
+  "license": "MIT",
+  "bin": { "blurit": "./cli.js" },
+  "dependencies": {
+    "sharp": "^0.33.0"
+  }
+}
